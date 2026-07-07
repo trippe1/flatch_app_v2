@@ -14,7 +14,6 @@ import 'package:flatch/common/models/comment_model.dart';
 import 'package:flatch/common/models/fart_model.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/audio_cache_service.dart';
-import 'package:flatch/common/services/download_sound.dart';
 import 'package:flatch/common/services/share_service.dart';
 import 'package:flatch/common/services/sound_library_services.dart';
 import 'package:flatch/common/services/toast_service.dart';
@@ -302,7 +301,6 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
     if (reportDoc.exists) {
       final reason = reportDoc.data()?['reason'] ?? '';
       showDialog(
-        // ignore: use_build_context_synchronously
         context: context,
         builder:
             (_) => AlertDialog(
@@ -331,7 +329,6 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
     // User hasn't reported yet → show input dialog
     final TextEditingController reasonController = TextEditingController();
     showDialog(
-      // ignore: use_build_context_synchronously
       context: context,
       builder:
           (_) => AlertDialog(

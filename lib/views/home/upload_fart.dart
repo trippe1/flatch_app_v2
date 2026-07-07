@@ -29,7 +29,6 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
   String? _uploadChoice;
   String? _filePath;
   String? _fileName;
-  String? _fileType;
   String? _selectedCategory;
   Duration? _audioDuration;
 
@@ -53,7 +52,6 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
       _uploadChoice = null;
       _filePath = null;
       _fileName = null;
-      _fileType = null;
       _selectedCategory = null;
       _audioDuration = null;
       _isPublic = true;
@@ -71,7 +69,6 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
       _uploadChoice = choice;
       _filePath = null;
       _fileName = null;
-      _fileType = null;
       _isPublic = true;
     });
   }
@@ -87,7 +84,6 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
     setState(() {
       _filePath = path;
       _fileName = name;
-      _fileType = type;
       _audioDuration = duration;
     });
   }

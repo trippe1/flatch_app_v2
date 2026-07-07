@@ -38,7 +38,7 @@ class AppLogics {
         sorted.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         break;
       case FartFilter.flagged:
-        return sorted.where((fart) => (fart.reportCount ?? 0) > 0).toList();
+        return sorted.where((fart) => (fart.reportCount) > 0).toList();
 
       case FartFilter.controversial:
         sorted.sort((a, b) {

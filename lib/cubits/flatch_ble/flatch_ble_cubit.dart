@@ -43,12 +43,6 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
   bool _connected = false;
   bool _downloading = false;
-  int _expectedSize = 0;
-  int _receivedBytes = 0;
-  final List<int> _downloadBuffer = [];
-
-  int _mtu = 185; // Default MTU size
-  String? _lastDeviceId;
 
   // ===================== AUTH =====================
 
@@ -231,9 +225,6 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       _connected = true;
 
-      // Save device ID for future reconnect
-      _lastDeviceId = device.remoteId.str;
-
       // Listen for disconnections
       _connSub?.cancel();
       _connSub = device.connectionState.listen((s) {
@@ -245,7 +236,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       // Request MTU size - only on Android
       if (Platform.isAndroid) {
-        _mtu = await device.requestMtu(185);
+        await device.requestMtu(185);
       }
 
       // Discover services
@@ -730,22 +721,6 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
   }
 
   // ===================== UTILS =====================
-
-  Future<void> _downloadAllSlots() async {
-    final slots = await requestSlotList();
-
-    for (final slot in slots) {
-      await downloadSlot(slot);
-
-      // wait until current download finishes
-      while (_downloading) {
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-
-      // let firmware breathe
-      await Future.delayed(const Duration(milliseconds: 300));
-    }
-  }
 
   Future<void> _sendCmdRaw(String cmd) async {
     try {

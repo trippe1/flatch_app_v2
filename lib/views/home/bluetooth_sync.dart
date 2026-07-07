@@ -30,7 +30,6 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
   StreamSubscription<double>? _downloadProgressSubscription;
   int? _currentDownloadSlot;
   bool _isDownloadingDialogOpen = false;
-  double _currentDownloadProgress = 0.0;
 
   @override
   void initState() {
@@ -65,10 +64,8 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           if (state.isDownloading && state.downloadingSlot != null) {
             if (!_isDownloadingDialogOpen) {
               _currentDownloadSlot = state.downloadingSlot;
-              _currentDownloadProgress = state.downloadProgress;
               _showDownloadDialog(context, state.downloadingSlot!);
             } else {
-              _currentDownloadProgress = state.downloadProgress;
               setState(() {}); // Update dialog progress
             }
           } else if (_isDownloadingDialogOpen && !state.isDownloading) {
@@ -730,7 +727,6 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
             state.isDownloading && state.downloadingSlot == slot;
         final filePath = state.downloadedFilePaths[slot];
         final hasLocalFile = filePath != null;
-        final fileName = hasLocalFile ? filePath!.split('/').last : '';
 
         return Padding(
           key: ValueKey(slot),
@@ -738,7 +734,7 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           child: FartCard(
             isReorderWidget: true,
             title: 'Slot $slot',
-            fileUrl: hasLocalFile ? filePath! : '',
+            fileUrl: hasLocalFile ? filePath : '',
             isPlaying: isDownloading,
             onPlayPause: () => cubit.playSlot(slot),
             onDownload:
@@ -755,7 +751,7 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
                 type: ToastificationType.success,
               );
             },
-            onShare: hasLocalFile ? () => _shareFile(filePath!) : null,
+            onShare: hasLocalFile ? () => _shareFile(filePath) : null,
           ),
         );
       },

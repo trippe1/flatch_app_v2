@@ -10,7 +10,6 @@ import 'package:flatch/common/services/sound_library_services.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flatch/common/extensions/media_query_extension.dart';
 import 'package:flatch/common/models/fart_model.dart';
-import 'package:flatch/common/services/download_sound.dart';
 import 'package:flatch/common/widgets/category_scroller.dart';
 import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flutter/material.dart';
