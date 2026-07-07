@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flatch/blocs/upload_fart/upload_fart_bloc.dart';
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flatch/common/services/toast_service.dart';
 import 'package:flatch/common/widgets/audio_player.dart';
 import 'package:flatch/common/widgets/audio_recorder.dart';
@@ -153,8 +154,8 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
 
     final fileType = pathToUpload.split('.').last.toLowerCase();
 
-    print("File Type: $fileType");
-    print("Path of the file: $pathToUpload");
+    appLogger.d("File Type: $fileType");
+    appLogger.d("Path of the file: $pathToUpload");
 
     context.read<UploadFartBloc>().add(
       UploadUserFart(

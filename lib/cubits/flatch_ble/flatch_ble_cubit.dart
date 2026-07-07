@@ -8,6 +8,7 @@ import 'package:bloc/bloc.dart';
 import 'package:crypto/crypto.dart';
 import 'package:equatable/equatable.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -92,50 +93,50 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
   void addFromLibrary(File sound) {
     final updated = List<File>.from(state.queuedLibrarySounds)..add(sound);
-    print("Added to queue: ${sound.path}");
+    appLogger.d("Added to queue: ${sound.path}");
     emit(state.copyWith(queuedLibrarySounds: updated));
   }
 
   Future<bool> syncToFlatch() async {
-    print('🔵 [SYNC] Started');
+    appLogger.d('🔵 [SYNC] Started');
 
     try {
       if (!_authed || _cmd == null || _data == null) {
-        print('❌ [SYNC] Not ready');
-        print('   authed=$_authed, cmd=$_cmd, data=$_data');
+        appLogger.e('❌ [SYNC] Not ready');
+        appLogger.d('   authed=$_authed, cmd=$_cmd, data=$_data');
         return false;
       }
 
-      print('🧹 [SYNC] Deleting existing slots: ${state.availableSlots}');
+      appLogger.d('🧹 [SYNC] Deleting existing slots: ${state.availableSlots}');
 
       // 1. Delete all existing device slots
       for (final slot in state.availableSlots) {
-        print('🗑️ [SYNC] Deleting slot $slot');
+        appLogger.d('🗑️ [SYNC] Deleting slot $slot');
         await deleteSlot(slot, silent: true);
       }
 
       if (state.queuedLibrarySounds.isEmpty) {
-        print('⚠️ [SYNC] No queued library sounds to upload');
+        appLogger.d('⚠️ [SYNC] No queued library sounds to upload');
         return false;
       }
 
-      print('📤 [SYNC] Uploading ${state.queuedLibrarySounds.length} sounds');
+      appLogger.d('📤 [SYNC] Uploading ${state.queuedLibrarySounds.length} sounds');
 
       // 2. Upload queued sounds starting from slot 1
       int slot = 1;
       for (final file in state.queuedLibrarySounds) {
-        print('📁 [SYNC] Uploading file: ${file.path} → slot $slot');
+        appLogger.d('📁 [SYNC] Uploading file: ${file.path} → slot $slot');
 
         if (!await file.exists()) {
-          print('❌ [SYNC] File does not exist: ${file.path}');
+          appLogger.e('❌ [SYNC] File does not exist: ${file.path}');
           return false;
         }
 
         final bytes = await file.readAsBytes();
-        print('📦 [SYNC] File size: ${bytes.length} bytes');
+        appLogger.d('📦 [SYNC] File size: ${bytes.length} bytes');
 
         await _sendCmd("UPLOAD_BEGIN:$slot,${bytes.length}");
-        print('➡️ [SYNC] UPLOAD_BEGIN sent for slot $slot');
+        appLogger.d('➡️ [SYNC] UPLOAD_BEGIN sent for slot $slot');
 
         const int cs = 180;
         int off = 0;
@@ -146,16 +147,16 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
           off = end;
         }
 
-        print('✅ [SYNC] Data sent for slot $slot');
+        appLogger.d('✅ [SYNC] Data sent for slot $slot');
 
         await _sendCmd("UPLOAD_END");
-        print('🏁 [SYNC] UPLOAD_END sent for slot $slot');
+        appLogger.d('🏁 [SYNC] UPLOAD_END sent for slot $slot');
 
         slot++;
       }
 
       // 3. Refresh slot list ONCE
-      print('🔄 [SYNC] Refreshing slot list');
+      appLogger.d('🔄 [SYNC] Refreshing slot list');
       await requestSlotList();
 
       emit(
@@ -165,12 +166,12 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         ),
       );
 
-      print('🟢 [SYNC] Completed successfully');
+      appLogger.d('🟢 [SYNC] Completed successfully');
       return true;
     } catch (e, s) {
-      print('❌ [SYNC] FAILED');
-      print('Error: $e');
-      print('Stack: $s');
+      appLogger.e('❌ [SYNC] FAILED');
+      appLogger.e('Error: $e');
+      appLogger.e('Stack: $s');
 
       emit(state.copyWith(statusMessage: "Error with Update"));
       return false;
@@ -436,28 +437,28 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         utf8.encode("ACK:$bytesReceived"),
         withoutResponse: true,
       );
-      print("📤 [ACK] Sent acknowledgement for $bytesReceived bytes");
+      appLogger.d("📤 [ACK] Sent acknowledgement for $bytesReceived bytes");
     } catch (e) {
-      print("❌ Error sending ACK: $e");
+      appLogger.e("❌ Error sending ACK: $e");
     }
   }
 
   void _handleData(List<int> chunk) {
     if (!_downloading) {
-      print("⚠️ [DL] Ignored chunk (not downloading)");
+      appLogger.d("⚠️ [DL] Ignored chunk (not downloading)");
       return;
     }
 
     if (_dlExpected <= 0) {
-      print("⚠️ [DL] Ignored chunk (DL_BEGIN not received yet)");
+      appLogger.d("⚠️ [DL] Ignored chunk (DL_BEGIN not received yet)");
       return;
     }
 
     _dlBuffer.add(chunk);
     _dlReceived += chunk.length;
 
-    print("📦 [DL] Data chunk received: ${chunk.length} bytes");
-    print("📊 [DL] Progress: $_dlReceived / $_dlExpected");
+    appLogger.d("📦 [DL] Data chunk received: ${chunk.length} bytes");
+    appLogger.d("📊 [DL] Progress: $_dlReceived / $_dlExpected");
 
     // Send immediate acknowledgment for important chunks
     if (_dlReceived % 2048 < 100) {
@@ -472,14 +473,14 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
     // Check if download is complete
     if (_dlReceived >= _dlExpected) {
-      print("✅ [DL] Download complete by byte count");
+      appLogger.d("✅ [DL] Download complete by byte count");
       _finishDownload();
     }
   }
 
   Future<void> _finishDownload() async {
-    print("🏁 [DL] Finish download called");
-    print("📊 [DL] Received $_dlReceived / $_dlExpected bytes");
+    appLogger.d("🏁 [DL] Finish download called");
+    appLogger.d("📊 [DL] Received $_dlReceived / $_dlExpected bytes");
 
     // Stop acknowledgment timer
     _stopAckTimer();
@@ -490,7 +491,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     _downloading = false;
 
     if (_dlExpected <= 0) {
-      print("❌ [DL] ERROR: DL_END without DL_BEGIN");
+      appLogger.e("❌ [DL] ERROR: DL_END without DL_BEGIN");
       emit(
         state.copyWith(
           isDownloading: false,
@@ -502,7 +503,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     }
 
     if (_dlReceived != _dlExpected) {
-      print("❌ [DL] ERROR: Size mismatch");
+      appLogger.e("❌ [DL] ERROR: Size mismatch");
       emit(
         state.copyWith(
           isDownloading: false,
@@ -552,7 +553,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     final bytes = res.files.first.bytes!;
     final slot = _firstEmptySlot();
 
-    print("Uploading to slot $slot");
+    appLogger.d("Uploading to slot $slot");
     emit(state.copyWith(statusMessage: "Uploading to slot $slot"));
 
     await _sendCmd("UPLOAD_BEGIN:$slot,${bytes.length}");
@@ -584,16 +585,16 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       return;
     }
 
-    print('Attempting to play slot $slot');
+    appLogger.d('Attempting to play slot $slot');
 
     try {
       // Send the command to play the slot
       await _sendCmd("PLAY:$slot");
-      print('Command sent to play slot $slot');
+      appLogger.d('Command sent to play slot $slot');
       emit(state.copyWith(statusMessage: "Playing slot $slot"));
     } catch (e) {
       // Catch any exceptions that occur during the command send
-      print('Error occurred while playing slot $slot: $e');
+      appLogger.e('Error occurred while playing slot $slot: $e');
       emit(state.copyWith(statusMessage: "Error playing slot $slot"));
     }
   }
@@ -610,7 +611,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
     try {
       await _sendCmd("DELETE:$slot");
-      print('Command sent to delete slot $slot');
+      appLogger.d('Command sent to delete slot $slot');
 
       final file = File('${_soundDir.path}/sound$slot.wav');
       if (await file.exists()) {
@@ -623,7 +624,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       emit(state.copyWith(statusMessage: "Slot $slot deleted"));
     } catch (e) {
-      print('Error occurred while deleting slot $slot: $e');
+      appLogger.e('Error occurred while deleting slot $slot: $e');
       emit(state.copyWith(statusMessage: "Error deleting slot $slot"));
     }
   }
@@ -636,7 +637,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     try {
       return await _listCompleter!.future.timeout(const Duration(seconds: 2));
     } catch (e) {
-      print("Error while requesting slot list: $e");
+      appLogger.e("Error while requesting slot list: $e");
       return [];
     }
   }
@@ -649,7 +650,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     try {
       await _cmd!.write(utf8.encode(cmd), withoutResponse: false);
     } catch (e) {
-      print("Error sending command: $e");
+      appLogger.e("Error sending command: $e");
     }
   }
 
@@ -678,7 +679,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     try {
       await _sendCmd("DOWNLOAD:$slot");
     } catch (e) {
-      print("Error starting download: $e");
+      appLogger.e("Error starting download: $e");
       _downloading = false;
       emit(
         state.copyWith(
@@ -726,7 +727,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     try {
       await _cmd!.write(utf8.encode(cmd), withoutResponse: false, timeout: 5);
     } catch (e) {
-      print("Error sending raw command: $e");
+      appLogger.e("Error sending raw command: $e");
     }
   }
 

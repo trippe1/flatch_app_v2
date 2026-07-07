@@ -1,3 +1,4 @@
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flatch/common/widgets/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -9,7 +10,7 @@ class FirebaseAuthError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("error $error");
+    appLogger.e("error $error");
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
