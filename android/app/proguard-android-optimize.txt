@@ -1,0 +1,6 @@
+# Default optimizations
+-optimizations !code/simplification/arithmetic,!field/*,!class/merging/*
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontpreverify
+-verbose

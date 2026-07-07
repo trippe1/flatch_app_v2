@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>373407548044-5eqls5qaqjsmibt6hmas97sigchc2ab3.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.373407548044-5eqls5qaqjsmibt6hmas97sigchc2ab3</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>373407548044-n8te0q0aco0c2becpm1hcj994lqa1k64.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBJR4m9AncWrKQb9aITbXQearl-OPrljp0</string>
+	<key>GCM_SENDER_ID</key>
+	<string>373407548044</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.flatch.flickedflatch</string>
+	<key>PROJECT_ID</key>
+	<string>flatch-e772e</string>
+	<key>STORAGE_BUCKET</key>
+	<string>flatch-e772e.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:373407548044:ios:df9896cf7aabf5ae5df1a9</string>
+</dict>
+</plist>

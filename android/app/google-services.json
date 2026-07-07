@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "373407548044",
+    "project_id": "flatch-e772e",
+    "storage_bucket": "flatch-e772e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:373407548044:android:06d243374482eeb65df1a9",
+        "android_client_info": {
+          "package_name": "com.flatch.flicked_flatch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "373407548044-n8te0q0aco0c2becpm1hcj994lqa1k64.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flatch.flicked_flatch",
+            "certificate_hash": "f2e86da17ab6426b5aab38b4c74cbc3b4e06052d"
+          }
+        },
+        {
+          "client_id": "373407548044-taf6tanpg8ampbvkbf87b6od6c23807a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flatch.flicked_flatch",
+            "certificate_hash": "5da4f15d7a4f8ebb8737bac0fe206fa2b82600ae"
+          }
+        },
+        {
+          "client_id": "373407548044-ec1srl09pmk7vo447nl894h5lumcri4i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8pzJx5O0bblQcuVj8DRL2TQKx8LaoELE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "373407548044-ec1srl09pmk7vo447nl894h5lumcri4i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "373407548044-7hib7n3sa0ummtjqg9uefqdephotafb5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.flatch.flickedflatch"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
