@@ -234,9 +234,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
       if (await file.exists()) {
         final fileName = filePath.split('/').last;
         final xFile = XFile(filePath, mimeType: _guessMime(fileName));
-        await Share.shareXFiles([
-          xFile,
-        ], text: 'Check out this sound: $fileName');
+        await SharePlus.instance.share(
+          ShareParams(files: [xFile], text: 'Check out this sound: $fileName'),
+        );
       } else {
         showToast(
           context: context,
@@ -708,8 +708,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
     return ReorderableListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: slots.length,
-      onReorder: (oldIndex, newIndex) async {
-        if (oldIndex < newIndex) newIndex -= 1;
+      // onReorderItem already adjusts newIndex for the removed item, so the
+      // manual `if (oldIndex < newIndex) newIndex -= 1;` compensation is gone.
+      onReorderItem: (oldIndex, newIndex) async {
         final item = slots.removeAt(oldIndex);
         slots.insert(newIndex, item);
 

@@ -76,7 +76,7 @@ class _AudioTrimSliderState extends State<AudioTrimSlider> {
               borderRadius: BorderRadius.circular(8),
             ),
             activeTrackBar: BoxDecoration(
-              color: Colors.teal.withOpacity(0.3),
+              color: Colors.teal.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
             inactiveTrackBarHeight: 6,
