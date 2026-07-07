@@ -13,7 +13,15 @@ part 'fetch_farts_event.dart';
 part 'fetch_farts_state.dart';
 
 class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
-  FetchFartsBloc() : super(FetchFartsInitial()) {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  /// [firestore] and [auth] are injectable for tests; they default to the real
+  /// singletons so production wiring (`FetchFartsBloc()`) is unchanged.
+  FetchFartsBloc({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance,
+      super(FetchFartsInitial()) {
     final Set<String> activeVoteTransactions = {};
     const int limit = 30;
     
@@ -22,13 +30,13 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
     on<FetchTopFarts>((event, emit) async {
       emit(FetchFartsLoading());
       try {
-        final userId = FirebaseAuth.instance.currentUser?.uid;
+        final userId = _auth.currentUser?.uid;
         if (userId == null) {
           emit(FetchFartsFailure('User not logged in'));
           return;
         }
 
-        Query query = FirebaseFirestore.instance
+        Query query = _firestore
             .collection('user_farts')
             .where('isPublic', isEqualTo: true)
             .orderBy('upvotes', descending: true)
@@ -59,10 +67,10 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       final currentState = state as FetchFartsSuccess;
 
       try {
-        final userId = FirebaseAuth.instance.currentUser?.uid;
+        final userId = _auth.currentUser?.uid;
         if (userId == null) return;
 
-        final query = FirebaseFirestore.instance
+        final query = _firestore
             .collection('user_farts')
             .where('isPublic', isEqualTo: true)
             .orderBy('upvotes', descending: true)
@@ -94,15 +102,15 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       activeVoteTransactions.add(fartId);
       print('🟡 Vote started for fartId: $fartId with type: ${event.voteType}');
 
-      final fartDoc = FirebaseFirestore.instance
+      final fartDoc = _firestore
           .collection('user_farts')
           .doc(fartId);
       final voteDoc = fartDoc
           .collection('votes')
-          .doc(FirebaseAuth.instance.currentUser!.uid);
+          .doc(_auth.currentUser!.uid);
 
       try {
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
+        await _firestore.runTransaction((transaction) async {
           final fartSnapshot = await transaction.get(fartDoc);
           if (!fartSnapshot.exists) {
             print('❌ Fart document not found');
@@ -159,16 +167,16 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       }
     });
     on<ReportFart>((event, emit) async {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
-      final fartRef = FirebaseFirestore.instance
+      final fartRef = _firestore
           .collection('user_farts')
           .doc(event.fartId);
 
       final reportRef = fartRef.collection('reports').doc(userId);
 
-      await FirebaseFirestore.instance.runTransaction((txn) async {
+      await _firestore.runTransaction((txn) async {
         final fartSnap = await txn.get(fartRef);
         if (!fartSnap.exists) return;
 
@@ -193,10 +201,10 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       });
     });
    on<ReportCommentFart>((event, emit) async {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
-      final commentRef = FirebaseFirestore.instance
+      final commentRef = _firestore
           .collection('user_farts')
           .doc(event.fartId)
           .collection('comments')
@@ -204,7 +212,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
 
       final reportRef = commentRef.collection('reports').doc(userId);
 
-      await FirebaseFirestore.instance.runTransaction((txn) async {
+      await _firestore.runTransaction((txn) async {
         final commentSnap = await txn.get(commentRef);
         if (!commentSnap.exists) return;
 
@@ -257,7 +265,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
 
     on<FetchCommentsFart>((event, emit) async {
       try {
-        final query = FirebaseFirestore.instance
+        final query = _firestore
             .collection('user_farts')
             .doc(event.fartId)
             .collection('comments')
@@ -293,7 +301,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       }
 
       try {
-        final query = FirebaseFirestore.instance
+        final query = _firestore
             .collection('user_farts')
             .doc(event.fartId)
             .collection('comments')
@@ -320,19 +328,19 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
     });
 
    on<AddCommentFart>((event, emit) async {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
       final commentRef =
-          FirebaseFirestore.instance
+          _firestore
               .collection('user_farts')
               .doc(event.fartId)
               .collection('comments')
               .doc();
 
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       final userDoc =
-          await FirebaseFirestore.instance
+          await _firestore
               .collection('app_users')
               .doc(user!.uid)
               .get();
@@ -357,7 +365,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
         await commentRef.set(comment.toMap());
 
         // Increment comment count in parent fart
-        final fartDoc = FirebaseFirestore.instance
+        final fartDoc = _firestore
             .collection('user_farts')
             .doc(event.fartId);
         await fartDoc.update({'commentCount': FieldValue.increment(1)});
@@ -382,11 +390,11 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
     });
 
     on<DeleteCommentFart>((event, emit) async {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
       try {
-        final commentRef = FirebaseFirestore.instance
+        final commentRef = _firestore
             .collection('user_farts')
             .doc(event.fartId)
             .collection('comments')
@@ -403,7 +411,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
 
         await commentRef.delete();
 
-        final fartDoc = FirebaseFirestore.instance
+        final fartDoc = _firestore
             .collection('user_farts')
             .doc(event.fartId);
         await fartDoc.update({'commentCount': FieldValue.increment(-1)});
@@ -430,7 +438,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
     });
   on<VoteCommentFart>((event, emit) async {
       try {
-        final commentRef = FirebaseFirestore.instance
+        final commentRef = _firestore
             .collection('user_farts')
             .doc(event.fartId)
             .collection('comments')
@@ -537,11 +545,11 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       }
     });
 on<EditCommentFart>((event, emit) async {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
       try {
-        final commentRef = FirebaseFirestore.instance
+        final commentRef = _firestore
             .collection('user_farts')
             .doc(event.fartId)
             .collection('comments')
@@ -597,7 +605,7 @@ on<EditCommentFart>((event, emit) async {
   ) async {
     if (docs.isEmpty) return const [];
 
-    final firestore = FirebaseFirestore.instance;
+    final firestore = _firestore;
 
     // 1) Resolve author names in batches of 30 (Firestore's `whereIn` limit).
     final uids = <String>{};
