@@ -86,7 +86,11 @@ class FartDetailsForm extends StatelessWidget {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
-                value: selectedCategory,
+                // Keyed by the controlled value so a programmatic reset (e.g.
+                // clearing the form) rebuilds the field with the new
+                // initialValue — `initialValue` alone only applies on first build.
+                key: ValueKey(selectedCategory),
+                initialValue: selectedCategory,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(
                   label: const Row(

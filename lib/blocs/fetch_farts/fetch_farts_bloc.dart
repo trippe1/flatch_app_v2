@@ -40,58 +40,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
 
         final snapshot = await query.get();
 
-        final futures = snapshot.docs.map((doc) async {
-          final data = doc.data() as Map<String, dynamic>;
-          final id = doc.id;
-          String? userName;
-          if (data['uid'] != null) {
-            final userDoc =
-                await FirebaseFirestore.instance
-                    .collection('app_users')
-                    .doc(data['uid'])
-                    .get();
-            userName = userDoc.data()?['name'];
-          }
-
-          final voteSnap =
-              await FirebaseFirestore.instance
-                  .collection('user_farts')
-                  .doc(id)
-                  .collection('votes')
-                  .doc(userId)
-                  .get();
-
-          final userVote =
-              (voteSnap.exists && voteSnap.data() != null)
-                  ? voteSnap.data()!['type'] as String?
-                  : null;
-
-          final reportSnap =
-              await FirebaseFirestore.instance
-                  .collection('user_farts')
-                  .doc(id)
-                  .collection('reports')
-                  .doc(userId)
-                  .get();
-
-          final userReported = reportSnap.exists;
-          final reportReason = reportSnap.data()?['reason'] as String?;
-
-          return FartModel.fromMap(
-            data,
-            userVote: userVote,
-
-            userReported: userReported,
-            reportReason: reportReason,
-          ).copyWith(
-            id: id,
-            userName: userName,
-            upvotes: data['upvotes'] ?? 0,
-            downvotes: data['downvotes'] ?? 0,
-          );
-        });
-
-        final farts = await Future.wait(futures);
+        final farts = await _enrichFarts(snapshot.docs, userId);
 
         emit(
           FetchFartsSuccess(
@@ -110,6 +59,9 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
       final currentState = state as FetchFartsSuccess;
 
       try {
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId == null) return;
+
         final query = FirebaseFirestore.instance
             .collection('user_farts')
             .where('isPublic', isEqualTo: true)
@@ -118,13 +70,7 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
             .limit(limit);
 
         final snapshot = await query.get();
-
-        final farts =
-            snapshot.docs
-                .map(
-                  (doc) => FartModel.fromMap(doc.data()).copyWith(id: doc.id),
-                )
-                .toList();
+        final farts = await _enrichFarts(snapshot.docs, userId);
 
         emit(
           FetchFartsSuccess(
@@ -634,5 +580,88 @@ on<EditCommentFart>((event, emit) async {
     });
 
 
+  }
+
+  /// Enriches raw `user_farts` documents with each author's display name and the
+  /// current user's vote/report state, then returns ready-to-render [FartModel]s.
+  ///
+  /// Author names are resolved with batched `whereIn` queries over deduplicated
+  /// author ids (≤30 per query) instead of one `app_users` read per fart, so a
+  /// page of clips by repeat authors costs far fewer reads. Vote/report state
+  /// still needs one read per fart (they live in a per-fart subcollection keyed
+  /// by user id), but those run concurrently to keep latency low. Eliminating
+  /// them entirely would require denormalizing that state onto the fart doc.
+  Future<List<FartModel>> _enrichFarts(
+    List<QueryDocumentSnapshot> docs,
+    String userId,
+  ) async {
+    if (docs.isEmpty) return const [];
+
+    final firestore = FirebaseFirestore.instance;
+
+    // 1) Resolve author names in batches of 30 (Firestore's `whereIn` limit).
+    final uids = <String>{};
+    for (final doc in docs) {
+      final uid = (doc.data() as Map<String, dynamic>)['uid'];
+      if (uid is String && uid.isNotEmpty) uids.add(uid);
+    }
+
+    final userNames = <String, String>{};
+    final uidList = uids.toList();
+    for (var i = 0; i < uidList.length; i += 30) {
+      final end = (i + 30 < uidList.length) ? i + 30 : uidList.length;
+      final chunk = uidList.sublist(i, end);
+      final usersSnap =
+          await firestore
+              .collection('app_users')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+      for (final userDoc in usersSnap.docs) {
+        final name = userDoc.data()['name'];
+        if (name is String) userNames[userDoc.id] = name;
+      }
+    }
+
+    // 2) Resolve the current user's vote + report for each fart concurrently.
+    return Future.wait(
+      docs.map((doc) async {
+        final data = doc.data() as Map<String, dynamic>;
+        final id = doc.id;
+
+        final snaps = await Future.wait([
+          firestore
+              .collection('user_farts')
+              .doc(id)
+              .collection('votes')
+              .doc(userId)
+              .get(),
+          firestore
+              .collection('user_farts')
+              .doc(id)
+              .collection('reports')
+              .doc(userId)
+              .get(),
+        ]);
+        final voteSnap = snaps[0];
+        final reportSnap = snaps[1];
+
+        final userVote =
+            (voteSnap.exists && voteSnap.data() != null)
+                ? voteSnap.data()!['type'] as String?
+                : null;
+
+        return FartModel.fromMap(
+          data,
+          userVote: userVote,
+          userReported: reportSnap.exists,
+          reportReason: reportSnap.data()?['reason'] as String?,
+        ).copyWith(
+          id: id,
+          userName: userNames[data['uid']] ?? '',
+          upvotes: data['upvotes'] ?? 0,
+          downvotes: data['downvotes'] ?? 0,
+        );
+      }),
+    );
   }
 }

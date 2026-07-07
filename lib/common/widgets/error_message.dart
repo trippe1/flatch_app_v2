@@ -1,4 +1,5 @@
 import 'package:flatch/common/extensions/auth_exceptions.dart';
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ class ErrorMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message is FirebaseAuthException) {
-      print('som');
+      appLogger.d('som');
       FirebaseAuthException e = message as FirebaseAuthException;
       return TextWidget(
         text: e.authError(),

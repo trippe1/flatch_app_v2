@@ -22,7 +22,6 @@ import 'package:flatch/cubits/delete_user_account/delete_user_account_cubit.dart
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flatch/cubits/flatch_ble/flatch_ble_cubit.dart';
 import 'package:flatch/cubits/login/company_login_cubit.dart';
-import 'package:flatch/cubits/upload_fart/upload_fart_cubit.dart';
 import 'package:flatch/cubits/user_app_dashboard/user_app_dashboard_cubit.dart';
 import 'package:flatch/cubits/user_app_update_password/user_app_update_password_cubit.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +35,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<UploadFartCubit>(create: (context) => UploadFartCubit()),
         BlocProvider<IndividualSignupBloc>(
           create: (context) => IndividualSignupBloc(),
         ),

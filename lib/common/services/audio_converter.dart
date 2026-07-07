@@ -1,3 +1,4 @@
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flutter/services.dart';
 
 class AudioConverter {
@@ -12,7 +13,7 @@ class AudioConverter {
       });
       return result; 
     } catch (e) {
-      print("Conversion failed: $e");
+      appLogger.e("Conversion failed: $e");
       return null;
     }
   }

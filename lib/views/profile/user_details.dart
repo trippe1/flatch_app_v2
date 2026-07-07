@@ -8,7 +8,6 @@ import 'package:flatch/common/models/app_user.dart';
 import 'package:flatch/common/models/fart_model.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/audio_cache_service.dart';
-import 'package:flatch/common/services/download_sound.dart';
 import 'package:flatch/common/services/share_service.dart';
 import 'package:flatch/common/services/sound_library_services.dart';
 import 'package:flatch/common/services/toast_service.dart';

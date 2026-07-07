@@ -40,9 +40,6 @@ class _AudioTrimSliderState extends State<AudioTrimSlider> {
     final totalSec = widget.duration.inSeconds.toDouble();
     final clampedTotal = totalSec > 0 ? totalSec : 1.0; // fallback
 
-    final positionSec =
-        widget.position.inSeconds.clamp(0, clampedTotal.toInt()).toDouble();
-
     return Column(
       children: [
         // --- Player controls ---
@@ -79,7 +76,7 @@ class _AudioTrimSliderState extends State<AudioTrimSlider> {
               borderRadius: BorderRadius.circular(8),
             ),
             activeTrackBar: BoxDecoration(
-              color: Colors.teal.withOpacity(0.3),
+              color: Colors.teal.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
             inactiveTrackBarHeight: 6,

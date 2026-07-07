@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'package:flatch/common/extensions/auth_exceptions.dart';
 import 'package:flatch/common/models/app_user.dart';
 import 'package:flatch/common/models/custom_claims.dart';
 import 'package:flatch/common/services/cloud_functions.dart';

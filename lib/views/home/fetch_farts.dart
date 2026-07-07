@@ -10,7 +10,6 @@ import 'package:flatch/common/services/sound_library_services.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flatch/common/extensions/media_query_extension.dart';
 import 'package:flatch/common/models/fart_model.dart';
-import 'package:flatch/common/services/download_sound.dart';
 import 'package:flatch/common/widgets/category_scroller.dart';
 import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flutter/material.dart';
@@ -208,36 +207,32 @@ class _FartsPageState extends State<FartsPage> {
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('Report Sound'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Why are you reporting this sound?'),
-                  const SizedBox(height: 12),
-                  RadioListTile<String>(
-                    value: 'Inappropriate',
-                    groupValue: selectedReason,
-                    title: const Text('Inappropriate'),
-                    onChanged: (val) => setState(() => selectedReason = val),
-                  ),
-                  RadioListTile<String>(
-                    value: 'Offensive',
-                    groupValue: selectedReason,
-                    title: const Text('Offensive'),
-                    onChanged: (val) => setState(() => selectedReason = val),
-                  ),
-                  RadioListTile<String>(
-                    value: 'Spam',
-                    groupValue: selectedReason,
-                    title: const Text('Spam or misleading'),
-                    onChanged: (val) => setState(() => selectedReason = val),
-                  ),
-                  RadioListTile<String>(
-                    value: 'Other',
-                    groupValue: selectedReason,
-                    title: const Text('Other'),
-                    onChanged: (val) => setState(() => selectedReason = val),
-                  ),
-                ],
+              content: RadioGroup<String>(
+                groupValue: selectedReason,
+                onChanged: (val) => setState(() => selectedReason = val),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Why are you reporting this sound?'),
+                    const SizedBox(height: 12),
+                    RadioListTile<String>(
+                      value: 'Inappropriate',
+                      title: const Text('Inappropriate'),
+                    ),
+                    RadioListTile<String>(
+                      value: 'Offensive',
+                      title: const Text('Offensive'),
+                    ),
+                    RadioListTile<String>(
+                      value: 'Spam',
+                      title: const Text('Spam or misleading'),
+                    ),
+                    RadioListTile<String>(
+                      value: 'Other',
+                      title: const Text('Other'),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(

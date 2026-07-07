@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flutter/services.dart';
 
 part 'audio_trim_state.dart';
@@ -66,7 +67,7 @@ class AudioTrimCubit extends Cubit<AudioTrimState> {
   }
 
   void clear() {
-    print('Clearing is happening');
+    appLogger.d('Clearing is happening');
     emit(const AudioTrimState());
   }
 }

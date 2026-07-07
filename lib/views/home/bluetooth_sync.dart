@@ -30,7 +30,6 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
   StreamSubscription<double>? _downloadProgressSubscription;
   int? _currentDownloadSlot;
   bool _isDownloadingDialogOpen = false;
-  double _currentDownloadProgress = 0.0;
 
   @override
   void initState() {
@@ -65,10 +64,8 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           if (state.isDownloading && state.downloadingSlot != null) {
             if (!_isDownloadingDialogOpen) {
               _currentDownloadSlot = state.downloadingSlot;
-              _currentDownloadProgress = state.downloadProgress;
               _showDownloadDialog(context, state.downloadingSlot!);
             } else {
-              _currentDownloadProgress = state.downloadProgress;
               setState(() {}); // Update dialog progress
             }
           } else if (_isDownloadingDialogOpen && !state.isDownloading) {
@@ -237,9 +234,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
       if (await file.exists()) {
         final fileName = filePath.split('/').last;
         final xFile = XFile(filePath, mimeType: _guessMime(fileName));
-        await Share.shareXFiles([
-          xFile,
-        ], text: 'Check out this sound: $fileName');
+        await SharePlus.instance.share(
+          ShareParams(files: [xFile], text: 'Check out this sound: $fileName'),
+        );
       } else {
         showToast(
           context: context,
@@ -711,8 +708,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
     return ReorderableListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: slots.length,
-      onReorder: (oldIndex, newIndex) async {
-        if (oldIndex < newIndex) newIndex -= 1;
+      // onReorderItem already adjusts newIndex for the removed item, so the
+      // manual `if (oldIndex < newIndex) newIndex -= 1;` compensation is gone.
+      onReorderItem: (oldIndex, newIndex) async {
         final item = slots.removeAt(oldIndex);
         slots.insert(newIndex, item);
 
@@ -730,7 +728,6 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
             state.isDownloading && state.downloadingSlot == slot;
         final filePath = state.downloadedFilePaths[slot];
         final hasLocalFile = filePath != null;
-        final fileName = hasLocalFile ? filePath!.split('/').last : '';
 
         return Padding(
           key: ValueKey(slot),
@@ -738,7 +735,7 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           child: FartCard(
             isReorderWidget: true,
             title: 'Slot $slot',
-            fileUrl: hasLocalFile ? filePath! : '',
+            fileUrl: hasLocalFile ? filePath : '',
             isPlaying: isDownloading,
             onPlayPause: () => cubit.playSlot(slot),
             onDownload:
@@ -755,7 +752,7 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
                 type: ToastificationType.success,
               );
             },
-            onShare: hasLocalFile ? () => _shareFile(filePath!) : null,
+            onShare: hasLocalFile ? () => _shareFile(filePath) : null,
           ),
         );
       },

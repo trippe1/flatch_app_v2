@@ -15,7 +15,9 @@ class CCheckBox extends StatelessWidget {
               isChecked ?? false
                   ? colorScheme
                       .primary // highlighted when checked
-                  : colorScheme.onSurface.withOpacity(0.6), // neutral border
+                  : colorScheme.onSurface.withValues(
+                    alpha: 0.6,
+                  ), // neutral border
           width: 2,
         ),
         borderRadius: BorderRadius.circular(4),

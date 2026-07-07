@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flatch/common/services/app_logger.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logger/logger.dart';
 import 'dart:io' show Platform;
@@ -361,7 +362,7 @@ class NotificationServices {
     if (notification == null ||
         notification.title == null ||
         notification.body == null) {
-      print(
+      appLogger.d(
         "🚨 No valid title or body found in the notification. Skipping display.",
       );
       return;
@@ -405,7 +406,7 @@ class NotificationServices {
       ),
     );
 
-    print("🔔 Notification displayed: Title: $title, Body: $body");
+    appLogger.d("🔔 Notification displayed: Title: $title, Body: $body");
   }
 
   Future<void> createNotificationChannel() async {
