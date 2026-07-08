@@ -43,6 +43,13 @@ int uploadSlot = 0;
 volatile bool g_playRequested = false;
 volatile int g_playRequestedSlot = -1;
 
+// Download is driven from loop() (not the BLE CMD callback) so the callback
+// returns immediately and the BLE stack stays free to receive a CANCEL command
+// mid-transfer. See doDownload().
+volatile bool g_dlRequested = false;
+volatile int g_dlRequestedSlot = -1;
+volatile bool g_cancelRequested = false;
+
 static uint32_t g_lastBtnMs = 0;
 static bool g_lastBtnState = true;
 static int g_playSlotCursor = 1;
@@ -175,6 +182,46 @@ static void restartAdvertisingSafe() {
   g_adv->stop();
   delay(120);
   BLEDevice::startAdvertising();
+}
+
+// Streams a slot to the client. Runs from loop() (Arduino task), NOT the BLE
+// callback, so a CANCEL command can arrive and be honored mid-transfer.
+static void doDownload(int s) {
+  File f = LittleFS.open(slotPath(s), "r");
+  if (!f) { setStatus("ERR:NOT_FOUND"); return; }
+
+  uint32_t size = (uint32_t)f.size();
+  setStatus("DL_BEGIN:" + String(s) + "," + String(size));
+
+  // Give the client time to receive DL_BEGIN and enable data notifications
+  // before the first chunk. Without this the opening chunks (including the WAV
+  // header) arrive before the app is listening and are dropped -- which is why
+  // downloaded files showed up empty / 0-length.
+  delay(150);
+
+  const size_t CHUNK = 180;  // matches the upload chunk size (negotiated MTU 185)
+  uint8_t buf[CHUNK];
+  uint32_t sent = 0;
+
+  while (f.available() && g_connected) {
+    if (g_cancelRequested) break;
+    size_t n = f.read(buf, CHUNK);
+    if (n == 0) break;
+    dataChar->setValue(buf, n);
+    dataChar->notify();
+    sent += (uint32_t)n;
+    delay(8);  // pace notifications so the client's BLE stack doesn't drop them
+  }
+
+  f.close();
+
+  if (g_cancelRequested) {
+    g_cancelRequested = false;
+    setStatus("DL_CANCELLED:" + String(s));
+    return;
+  }
+
+  setStatus("DL_END:" + String(s) + "," + String(sent));
 }
 
 class ServerCB : public BLEServerCallbacks {
@@ -315,31 +362,22 @@ class CmdCB : public BLECharacteristicCallbacks {
       return;
     }
 
+    if (cmd == "CANCEL") {
+      // Aborts an in-progress download; honored inside doDownload()'s loop.
+      g_cancelRequested = true;
+      return;
+    }
+
     if (cmd.startsWith("DOWNLOAD:")) {
       int s = cmd.substring(9).toInt();
       if (!isValidSlot(s)) { setStatus("ERR:BAD_SLOT"); return; }
+      if (!LittleFS.exists(slotPath(s))) { setStatus("ERR:NOT_FOUND"); return; }
 
-      File f = LittleFS.open(slotPath(s), "r");
-      if (!f) { setStatus("ERR:NOT_FOUND"); return; }
-
-      uint32_t size = (uint32_t)f.size();
-      setStatus("DL_BEGIN:" + String(s) + "," + String(size));
-
-      const size_t CHUNK = 20;
-      uint8_t buf[CHUNK];
-      uint32_t sent = 0;
-
-      while (f.available() && g_connected) {
-        size_t n = f.read(buf, CHUNK);
-        if (n == 0) break;
-        dataChar->setValue(buf, n);
-        dataChar->notify();
-        sent += (uint32_t)n;
-        delay(10);
-      }
-
-      f.close();
-      setStatus("DL_END:" + String(s) + "," + String(sent));
+      // Defer streaming to loop() so this callback returns and the BLE stack
+      // stays free to receive a CANCEL while the transfer is running.
+      g_cancelRequested = false;
+      g_dlRequestedSlot = s;
+      g_dlRequested = true;
       return;
     }
 
@@ -404,6 +442,13 @@ void setup() {
 }
 
 void loop() {
+  if (g_dlRequested) {
+    g_dlRequested = false;
+    int s = g_dlRequestedSlot;
+    g_dlRequestedSlot = -1;
+    doDownload(s);
+  }
+
   if (g_playRequested) {
     int s = g_playRequestedSlot;
     g_playRequested = false;

@@ -755,6 +755,8 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
   void cancelTransfer() {
     _cancelRequested = true;
     if (_downloading) {
+      // Tell the device to stop streaming (firmware honors CANCEL mid-download).
+      _sendCmd("CANCEL").ignore();
       _downloading = false;
       _stopAckTimer();
       _dlBuffer.clear();
