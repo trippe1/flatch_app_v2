@@ -115,6 +115,8 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
               actions: [
                 TextButton(
                   onPressed: () {
+                    // Actually abort the transfer (not just close the dialog).
+                    context.read<FlatchBleCubit>().cancelTransfer();
                     Navigator.pop(context);
                     _isDownloadingDialogOpen = false;
                   },

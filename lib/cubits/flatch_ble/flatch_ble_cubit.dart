@@ -44,6 +44,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
   bool _connected = false;
   bool _downloading = false;
+  bool _cancelRequested = false;
 
   // ===================== AUTH =====================
 
@@ -107,57 +108,86 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         return false;
       }
 
-      appLogger.d('🧹 [SYNC] Deleting existing slots: ${state.availableSlots}');
-
-      // 1. Delete all existing device slots
-      for (final slot in state.availableSlots) {
-        appLogger.d('🗑️ [SYNC] Deleting slot $slot');
-        await deleteSlot(slot, silent: true);
-      }
-
       if (state.queuedLibrarySounds.isEmpty) {
         appLogger.d('⚠️ [SYNC] No queued library sounds to upload');
         return false;
       }
 
-      appLogger.d('📤 [SYNC] Uploading ${state.queuedLibrarySounds.length} sounds');
+      _cancelRequested = false;
 
-      // 2. Upload queued sounds starting from slot 1
-      int slot = 1;
-      for (final file in state.queuedLibrarySounds) {
-        appLogger.d('📁 [SYNC] Uploading file: ${file.path} → slot $slot');
+      // Additive sync: keep the tracks already on the device and only fill the
+      // empty slots. The device has 9 slots total.
+      const int maxSlots = 9;
+      final freeSlots = <int>[];
+      for (int s = 1; s <= maxSlots; s++) {
+        if (!state.availableSlots.contains(s)) freeSlots.add(s);
+      }
+
+      final queued = state.queuedLibrarySounds;
+      if (queued.length > freeSlots.length) {
+        appLogger.e('❌ [SYNC] Not enough free slots');
+        emit(
+          state.copyWith(
+            statusMessage:
+                "Not enough space on Flatch: ${freeSlots.length} slot(s) free, "
+                "${queued.length} queued. Remove some tracks first.",
+          ),
+        );
+        return false;
+      }
+
+      appLogger.d(
+        '📤 [SYNC] Uploading ${queued.length} sound(s) into free slots $freeSlots',
+      );
+
+      int uploaded = 0;
+      for (int i = 0; i < queued.length; i++) {
+        if (_cancelRequested) break;
+
+        final file = queued[i];
+        final slot = freeSlots[i];
+        appLogger.d('📁 [SYNC] Uploading ${file.path} → slot $slot');
 
         if (!await file.exists()) {
           appLogger.e('❌ [SYNC] File does not exist: ${file.path}');
+          emit(state.copyWith(statusMessage: "A queued file is missing"));
+          await requestSlotList();
           return false;
         }
 
         final bytes = await file.readAsBytes();
-        appLogger.d('📦 [SYNC] File size: ${bytes.length} bytes');
-
         await _sendCmd("UPLOAD_BEGIN:$slot,${bytes.length}");
-        appLogger.d('➡️ [SYNC] UPLOAD_BEGIN sent for slot $slot');
 
         const int cs = 180;
         int off = 0;
-
         while (off < bytes.length) {
+          if (_cancelRequested) break;
           final end = min(off + cs, bytes.length);
           await _data!.write(bytes.sublist(off, end), withoutResponse: true);
           off = end;
         }
 
-        appLogger.d('✅ [SYNC] Data sent for slot $slot');
-
+        // UPLOAD_END commits the slot; on a partial/cancelled transfer the
+        // firmware discards it via its size check.
         await _sendCmd("UPLOAD_END");
-        appLogger.d('🏁 [SYNC] UPLOAD_END sent for slot $slot');
-
-        slot++;
+        if (_cancelRequested) break;
+        uploaded++;
       }
 
-      // 3. Refresh slot list ONCE
-      appLogger.d('🔄 [SYNC] Refreshing slot list');
+      // Refresh the device slot list to reflect what actually landed.
       await requestSlotList();
+
+      if (_cancelRequested) {
+        appLogger.d('🟡 [SYNC] Cancelled after $uploaded upload(s)');
+        // Drop the sounds that completed; keep the rest queued for a retry.
+        emit(
+          state.copyWith(
+            queuedLibrarySounds: queued.sublist(uploaded),
+            statusMessage: "Sync cancelled",
+          ),
+        );
+        return false;
+      }
 
       emit(
         state.copyWith(
@@ -515,6 +545,28 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     }
 
     final bytes = _dlBuffer.takeBytes();
+
+    // Guard against truncated transfers. The byte counter (_dlReceived) can be
+    // inflated by DL_PROG status frames reporting the device's *sent* count, so
+    // when chunks are dropped in transit the size check above still passes.
+    // Validate the actual received buffer length here — a short/empty buffer
+    // means data was lost, so surface a retry instead of saving 0-length audio.
+    if (bytes.isEmpty || bytes.length != _dlExpected) {
+      appLogger.e(
+        '❌ [DL] Truncated: got ${bytes.length} of $_dlExpected bytes',
+      );
+      emit(
+        state.copyWith(
+          isDownloading: false,
+          downloadingSlot: null,
+          downloadProgress: 0,
+          statusMessage:
+              "Download incomplete (${bytes.length}/$_dlExpected bytes) — please retry",
+        ),
+      );
+      return;
+    }
+
     final fileName = 'sound$_dlSlot.wav';
 
     // Save to app directory
@@ -661,6 +713,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     }
 
     // Reset download state
+    _cancelRequested = false;
     _dlSlot = slot;
     _dlExpected = 0;
     _dlReceived = 0;
@@ -686,6 +739,33 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
           isDownloading: false,
           downloadingSlot: null,
           statusMessage: "Download failed to start",
+        ),
+      );
+    }
+  }
+
+  /// Cancels an in-progress transfer (an upload sync or a download).
+  ///
+  /// Uploads: the sync loop checks [_cancelRequested] between chunks and sends
+  /// an early UPLOAD_END so the firmware discards the partial slot.
+  /// Downloads: the client stops accumulating and frees the UI immediately.
+  /// (The current firmware keeps streaming the remainder of a download — it
+  /// can't be aborted mid-transfer without a firmware change — but the app now
+  /// ignores those leftover chunks instead of hanging on the dialog.)
+  void cancelTransfer() {
+    _cancelRequested = true;
+    if (_downloading) {
+      _downloading = false;
+      _stopAckTimer();
+      _dlBuffer.clear();
+      _dlExpected = 0;
+      _dlReceived = 0;
+      emit(
+        state.copyWith(
+          isDownloading: false,
+          downloadingSlot: null,
+          downloadProgress: 0,
+          statusMessage: "Transfer cancelled",
         ),
       );
     }
