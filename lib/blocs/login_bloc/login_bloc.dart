@@ -26,6 +26,12 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
           email: event.email,
           password: event.password,
         );
+        // Refresh from the server before reading emailVerified: a completed
+        // password reset (or out-of-band verification) sets emailVerified=true
+        // server-side, but the freshly-returned token is stale. Without this
+        // reload the user is wrongly bounced to the "email not verified" screen
+        // and perceives it as "can't log in with my new password".
+        await auth.currentUser?.reload();
         User? user = auth.currentUser;
 
         if (user != null) {
