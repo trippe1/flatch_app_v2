@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "373407548044-6nrm47p63luiuf0m8r0hn6dl7m6doh4m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flatch.flicked_flatch",
+            "certificate_hash": "cc1d399794e9b6c728c1d017f04c666f7623264a"
+          }
+        },
+        {
           "client_id": "373407548044-n8te0q0aco0c2becpm1hcj994lqa1k64.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -47,7 +55,7 @@
               "client_type": 3
             },
             {
-              "client_id": "373407548044-7hib7n3sa0ummtjqg9uefqdephotafb5.apps.googleusercontent.com",
+              "client_id": "373407548044-5eqls5qaqjsmibt6hmas97sigchc2ab3.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
                 "bundle_id": "com.flatch.flickedflatch"
