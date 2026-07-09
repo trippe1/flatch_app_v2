@@ -64,6 +64,50 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:373407548044:android:68fbc0f1ad4fa4055df1a9",
+        "android_client_info": {
+          "package_name": "com.flickedllc.flatch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "373407548044-douj23574kv76ug3qnsvskbu4s7tvusq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flickedllc.flatch",
+            "certificate_hash": "cc1d399794e9b6c728c1d017f04c666f7623264a"
+          }
+        },
+        {
+          "client_id": "373407548044-ec1srl09pmk7vo447nl894h5lumcri4i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8pzJx5O0bblQcuVj8DRL2TQKx8LaoELE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "373407548044-ec1srl09pmk7vo447nl894h5lumcri4i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "373407548044-5eqls5qaqjsmibt6hmas97sigchc2ab3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.flatch.flickedflatch"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

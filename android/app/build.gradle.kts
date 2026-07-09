@@ -20,7 +20,11 @@ android {
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.flatch.flicked_flatch"
+        // New package identity for the new Play account (the old
+        // com.flatch.flicked_flatch is permanently reserved to the previous
+        // developer's restricted account). namespace stays the same so the
+        // Kotlin/Java source package doesn't have to move.
+        applicationId = "com.flickedllc.flatch"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode
