@@ -34,7 +34,11 @@ extension AuthExceptionsHandler on FirebaseAuthException {
       case "company-code-not-found":
         return "❌ Invalid company code. Please check your company code and try again!";
       default:
-        return "⚠️ Something went wrong. Please try again!";
+        // Surface the real code/message so failures (e.g. Play Integrity /
+        // reCAPTCHA attestation on devices without Google Play, or a blocked
+        // Firestore/Auth endpoint) are diagnosable instead of hidden.
+        return "⚠️ Something went wrong. Please try again!"
+            "\n(code: $code${message != null ? " — $message" : ""})";
     }
   }
 }
