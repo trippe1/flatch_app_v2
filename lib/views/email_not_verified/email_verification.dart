@@ -17,31 +17,66 @@ class EmailVerificationScreen extends StatefulWidget {
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   late Timer _verificationTimer;
+  Timer? _cooldownTimer;
   bool _isEmailVerified = false;
+  bool _checking = false;
+  int _resendIn = 0;
 
   @override
   void initState() {
     super.initState();
+    // Poll gently (was every 2s, forever — a real battery/network drain).
+    _verificationTimer = Timer.periodic(
+      const Duration(seconds: 6),
+      (_) => _checkVerified(),
+    );
+  }
 
-    _verificationTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+  Future<void> _checkVerified() async {
+    if (_checking) return;
+    if (mounted) setState(() => _checking = true);
+    try {
       final user = FirebaseAuth.instance.currentUser;
       await user?.reload();
       if (user != null && user.emailVerified) {
         _verificationTimer.cancel();
-
+        _cooldownTimer?.cancel();
         if (mounted) {
           setState(() => _isEmailVerified = true);
-
-          // Navigate to main screen after verification
           context.goNamed(AppRoute.home.name);
         }
       }
+    } catch (_) {
+      // transient network error — the next poll retries
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.emailVerified) return;
+    await user.sendEmailVerification();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verification email sent again!')),
+    );
+    setState(() => _resendIn = 30);
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) t.cancel();
     });
   }
 
   @override
   void dispose() {
     _verificationTimer.cancel();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -74,18 +109,19 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       ),
                       const SizedBox(height: 30),
                       ElevatedButton(
-                        onPressed: () async {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user != null && !user.emailVerified) {
-                            await user.sendEmailVerification();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Verification email sent again!'),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text('Resend Email'),
+                        onPressed: _checking ? null : _checkVerified,
+                        child: Text(
+                          _checking ? 'Checking…' : "I've verified — continue",
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _resendIn > 0 ? null : _resend,
+                        child: Text(
+                          _resendIn > 0
+                              ? 'Resend email (${_resendIn}s)'
+                              : 'Resend Email',
+                        ),
                       ),
                       ElevatedButton(
                         onPressed: () async {

@@ -269,7 +269,10 @@ class _UploadFartScreenState extends State<UploadFartScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: UploadButtonWidget(
-                canUpload: true,
+                canUpload:
+                    _filePath != null &&
+                    _titleController.text.trim().isNotEmpty &&
+                    _selectedCategory != null,
                 onUpload: _handleUpload,
               ),
             ),
