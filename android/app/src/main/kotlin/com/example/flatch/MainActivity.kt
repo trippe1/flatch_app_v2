@@ -96,7 +96,7 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val command =
-                            "-y -i \"$inputPath\" -ac 1 -ar 44100 $codecArg \"${outputFile.absolutePath}\""
+                            "-y -i \"$inputPath\" -ac 1 -ar 22050 $codecArg \"${outputFile.absolutePath}\""
 
                         FFmpegKit.executeAsync(command) { session ->
                             val rc: ReturnCode = session.returnCode
@@ -128,7 +128,7 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val command =
-                            "-y -ss $start -t $duration -i \"$inputPath\" -ac 1 -ar 44100 $codecArg \"${outputFile.absolutePath}\""
+                            "-y -ss $start -t $duration -i \"$inputPath\" -ac 1 -ar 22050 $codecArg \"${outputFile.absolutePath}\""
 
                         FFmpegKit.executeAsync(command) { session ->
                             val rc: ReturnCode = session.returnCode

@@ -8,7 +8,7 @@
 #include <vector>
 #include "mbedtls/md.h"
 
-#define I2S_SAMPLE_RATE 44100
+#define I2S_SAMPLE_RATE 22050
 #define I2S_DOUT 22
 #define I2S_BCLK 26
 #define I2S_LRC 25
