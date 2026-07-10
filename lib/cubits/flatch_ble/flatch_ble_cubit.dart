@@ -648,9 +648,21 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     appLogger.d("Uploading to slot $slot");
     emit(state.copyWith(statusMessage: "Uploading to slot $slot"));
 
-    await _sendCmd("UPLOAD_BEGIN:$slot,${bytes.length}");
+    // Same handshake as the multi-file sync: wait for the device to ack each
+    // command so we don't race its flash work.
+    if (!await _sendCmdAwaitAck("UPLOAD_BEGIN:$slot,${bytes.length}")) {
+      emit(
+        state.copyWith(
+          uploadProgress: 0,
+          statusMessage: "Upload stalled — please retry",
+        ),
+      );
+      await requestSlotList();
+      return;
+    }
     const int cs = 180;
     int off = 0;
+    int chunk = 0;
 
     while (off < bytes.length) {
       final end = min(off + cs, bytes.length);
@@ -658,9 +670,22 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       off = end;
 
       emit(state.copyWith(uploadProgress: off / bytes.length));
+      // Pace the stream so the ESP32's synchronous LittleFS writes keep up.
+      if (++chunk % 8 == 0) {
+        await Future.delayed(const Duration(milliseconds: 6));
+      }
     }
 
-    await _sendCmd("UPLOAD_END");
+    if (!await _sendCmdAwaitAck("UPLOAD_END")) {
+      emit(
+        state.copyWith(
+          uploadProgress: 0,
+          statusMessage: "Upload stalled — please retry",
+        ),
+      );
+      await requestSlotList();
+      return;
+    }
     await requestSlotList();
 
     emit(state.copyWith(uploadProgress: 0, statusMessage: "Upload complete"));
