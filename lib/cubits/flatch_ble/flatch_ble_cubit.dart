@@ -60,6 +60,9 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
   Timer? _ackTimer;
 
   Completer<List<int>>? _listCompleter;
+  // Completes when the device sends a terminal command status ("OK" / "ERR:..."),
+  // used to handshake multi-file uploads so we don't race the ESP32's flash work.
+  Completer<String>? _ackCompleter;
 
   late Directory _soundDir;
 
@@ -156,22 +159,51 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         }
 
         final bytes = await file.readAsBytes();
-        await _sendCmd("UPLOAD_BEGIN:$slot,${bytes.length}");
+
+        // Wait for the device to acknowledge it opened the slot before streaming
+        // data. Without this handshake, on a multi-file sync the next command
+        // races the ESP32's flash work and gets dropped — only the first file
+        // lands and BLE appears to freeze.
+        if (!await _sendCmdAwaitAck("UPLOAD_BEGIN:$slot,${bytes.length}")) {
+          appLogger.e('❌ [SYNC] No ack for UPLOAD_BEGIN (slot $slot)');
+          emit(state.copyWith(statusMessage: "Upload stalled — please retry"));
+          await requestSlotList();
+          emit(state.copyWith(queuedLibrarySounds: queued.sublist(uploaded)));
+          return false;
+        }
 
         const int cs = 180;
         int off = 0;
+        int chunk = 0;
         while (off < bytes.length) {
           if (_cancelRequested) break;
           final end = min(off + cs, bytes.length);
           await _data!.write(bytes.sublist(off, end), withoutResponse: true);
           off = end;
+          // Pace the stream so the ESP32's synchronous LittleFS writes keep up
+          // and its BLE receive buffer doesn't overflow on sustained transfers.
+          if (++chunk % 8 == 0) {
+            await Future.delayed(const Duration(milliseconds: 6));
+          }
+        }
+        if (_cancelRequested) {
+          await _sendCmd("UPLOAD_END"); // let the device discard the partial
+          break;
         }
 
-        // UPLOAD_END commits the slot; on a partial/cancelled transfer the
-        // firmware discards it via its size check.
-        await _sendCmd("UPLOAD_END");
-        if (_cancelRequested) break;
+        // Wait for the device to finish committing the slot (flash write +
+        // rename) before starting the next file.
+        if (!await _sendCmdAwaitAck("UPLOAD_END")) {
+          appLogger.e('❌ [SYNC] No ack for UPLOAD_END (slot $slot)');
+          emit(state.copyWith(statusMessage: "Upload stalled — please retry"));
+          await requestSlotList();
+          emit(state.copyWith(queuedLibrarySounds: queued.sublist(uploaded)));
+          return false;
+        }
         uploaded++;
+
+        // Small settle gap between files.
+        await Future.delayed(const Duration(milliseconds: 120));
       }
 
       // Refresh the device slot list to reflect what actually landed.
@@ -392,6 +424,14 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       if (_listCompleter != null && !_listCompleter!.isCompleted) {
         _listCompleter!.complete(slots);
+      }
+      return;
+    }
+
+    // Terminal command acknowledgement — unblocks _sendCmdAwaitAck().
+    if (msg == "OK" || msg.startsWith("ERR:")) {
+      if (_ackCompleter != null && !_ackCompleter!.isCompleted) {
+        _ackCompleter!.complete(msg == "OK" ? "OK" : msg);
       }
       return;
     }
@@ -703,6 +743,28 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       await _cmd!.write(utf8.encode(cmd), withoutResponse: false);
     } catch (e) {
       appLogger.e("Error sending command: $e");
+    }
+  }
+
+  /// Sends a command and waits for the device's terminal status ("OK", or an
+  /// "ERR:..."). This lets a multi-file upload wait for the ESP32 to finish its
+  /// (slow, synchronous) flash work before the next command — without it, the
+  /// next UPLOAD_BEGIN races ahead and is dropped, so only the first file lands
+  /// and BLE appears to freeze. Returns true only on "OK".
+  Future<bool> _sendCmdAwaitAck(
+    String cmd, {
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    _ackCompleter = Completer<String>();
+    await _sendCmd(cmd);
+    try {
+      final resp = await _ackCompleter!.future.timeout(timeout);
+      return resp == "OK";
+    } catch (e) {
+      appLogger.e("⏱️ [BLE] No ack for '$cmd' (${e.runtimeType})");
+      return false;
+    } finally {
+      _ackCompleter = null;
     }
   }
 
