@@ -395,13 +395,47 @@ class _FartsPageState extends State<FartsPage> {
                       state is FetchFartsInitial) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (state is FetchFartsFailure) {
-                    return Center(child: Text("Error: ${state.error}"));
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.wifi_off_rounded, size: 48),
+                          const SizedBox(height: 12),
+                          const Text("Couldn't load the feed"),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              final cat =
+                                  context
+                                      .read<FetchFartsCubit>()
+                                      .state
+                                      .selectedCategory;
+                              context.read<FetchFartsBloc>().add(
+                                FetchTopFarts(category: cat),
+                              );
+                            },
+                            child: const Text("Retry"),
+                          ),
+                        ],
+                      ),
+                    );
                   }
 
                   return BlocBuilder<FetchFartsCubit, FetchFartsCubitState>(
                     builder: (context, cubitState) {
                       if (cubitState.farts.isEmpty) {
-                        return const Center(child: Text("No farts found."));
+                        return const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.graphic_eq_rounded, size: 48),
+                              SizedBox(height: 12),
+                              Text("It's quiet in here"),
+                              SizedBox(height: 4),
+                              Text("No farts yet — be the first to drop one."),
+                            ],
+                          ),
+                        );
                       }
                       final visibleFarts = AppLogics.instance.applyFilter(
                         cubitState.farts,

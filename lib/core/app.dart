@@ -102,10 +102,16 @@ class MyApp extends StatelessWidget {
               darkTheme: AppStyles.dark,
               themeMode: themeMode,
               builder: (context, child) {
+                // Respect the OS font-size setting but clamp it so the layout
+                // stays intact (was fully disabled via TextScaler.noScaling,
+                // an accessibility regression + App Store review risk).
+                final scale = MediaQuery.textScalerOf(
+                  context,
+                ).scale(1.0).clamp(0.9, 1.2).toDouble();
                 return MediaQuery(
                   data: MediaQuery.of(
                     context,
-                  ).copyWith(textScaler: TextScaler.noScaling),
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
                   child: child!,
                 );
               },
