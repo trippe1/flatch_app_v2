@@ -4,7 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_audio_output/flutter_audio_output.dart';
+import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -206,7 +206,7 @@ class AudioService {
 
   Future<void> play() async {
    
-    await FlutterAudioOutput.changeToSpeaker();
+    await AudioRoute.toSpeakerUnlessHeadphones();
     await _player.play();
   }
 

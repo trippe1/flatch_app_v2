@@ -10,7 +10,7 @@ import 'package:flatch/common/services/audio_cache_service.dart';
 import 'package:flatch/common/services/share_service.dart';
 import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_audio_output/flutter_audio_output.dart';
+import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:go_router/go_router.dart';
@@ -80,7 +80,7 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
         final localPath = await getOrDownloadFart(url);
 
         await _player.setFilePath(localPath);
-        await FlutterAudioOutput.changeToSpeaker();
+        await AudioRoute.toSpeakerUnlessHeadphones();
         await _player.play();
       } catch (e) {
         debugPrint('Audio error: $e');

@@ -4,7 +4,7 @@ import 'package:flatch/common/models/fart_model.dart';
 import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flatch/common/services/audio_cache_service.dart';
 import 'package:flatch/common/services/share_service.dart';
-import 'package:flutter_audio_output/flutter_audio_output.dart';
+import 'package:flatch/common/services/audio_route.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:go_router/go_router.dart';
 
@@ -28,7 +28,7 @@ class _FartPreviewScreenState extends State<FartPreviewScreen> {
     } else {
       setState(() => _currentlyPlayingUrl = url);
       try {
-         await FlutterAudioOutput.changeToSpeaker();
+         await AudioRoute.toSpeakerUnlessHeadphones();
         final localPath = await getOrDownloadFart(url);
         await _player.setFilePath(localPath);
         await _player.play();

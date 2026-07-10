@@ -22,7 +22,7 @@ import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_audio_output/flutter_audio_output.dart';
+import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gap/gap.dart' show Gap;
 import 'package:go_router/go_router.dart';
@@ -107,7 +107,7 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
     } else {
       setState(() => _currentlyPlayingUrl = url);
       try {
-        await FlutterAudioOutput.changeToSpeaker();
+        await AudioRoute.toSpeakerUnlessHeadphones();
         final localPath = await getOrDownloadFart(url);
         await _player.setFilePath(localPath);
         await _player.play();

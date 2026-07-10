@@ -16,7 +16,7 @@ import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_audio_output/flutter_audio_output.dart';
+import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flatch/blocs/user_details/user_details_bloc.dart';
 import 'package:gap/gap.dart';
@@ -114,7 +114,7 @@ class _UsersDetailsScreenState extends State<UsersDetailsScreen> {
       try {
         final localPath = await getOrDownloadFart(url);
         await _player.setFilePath(localPath);
-        await FlutterAudioOutput.changeToSpeaker();
+        await AudioRoute.toSpeakerUnlessHeadphones();
         await _player.play();
       } catch (e) {
         debugPrint('Audio error: $e');
