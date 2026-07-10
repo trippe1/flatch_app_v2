@@ -28,9 +28,13 @@ class FartsPage extends StatefulWidget {
 
 class _FartsPageState extends State<FartsPage> {
   final AudioPlayer _player = AudioPlayer();
+  final ScrollController _scrollController = ScrollController();
   StreamSubscription<PlayerState>? _playerSub;
   String? _currentlyPlayingUrl;
   FartFilter _currentFilter = FartFilter.sortBy;
+  // Guards against re-dispatching FetchMoreFarts for a page already requested
+  // (the scroll listener fires many times near the bottom).
+  String? _lastRequestedDocId;
 
   @override
   void initState() {
@@ -52,12 +56,30 @@ class _FartsPageState extends State<FartsPage> {
         }
       }
     });
+
+    // Infinite scroll: load the next page as the user nears the bottom.
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels <
+          _scrollController.position.maxScrollExtent - 300) {
+        return;
+      }
+      final bloc = context.read<FetchFartsBloc>();
+      final state = bloc.state;
+      if (state is FetchFartsSuccess &&
+          state.hasMore &&
+          state.lastDoc != null &&
+          state.lastDoc!.id != _lastRequestedDocId) {
+        _lastRequestedDocId = state.lastDoc!.id;
+        bloc.add(FetchMoreFarts(state.lastDoc!));
+      }
+    });
   }
 
   @override
   void dispose() {
     _playerSub?.cancel();
     _player.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -391,6 +413,7 @@ class _FartsPageState extends State<FartsPage> {
                               .toList();
 
                       return ListView.builder(
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(12),
                         itemCount: sortedFarts.length,
                         itemBuilder: (context, index) {

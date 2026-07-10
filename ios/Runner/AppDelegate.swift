@@ -168,7 +168,7 @@ import ffmpegkit
         if outputFile.path.hasSuffix(".wav") { codecArg = "-c:a pcm_s16le" }
 
         let command =
-          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 \(codecArg) \"\(outputFile.path)\""
+          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
 
         FFmpegKit.executeAsync(command) { session in
           let rc = session?.getReturnCode()
@@ -213,7 +213,7 @@ import ffmpegkit
         if outputFile.path.hasSuffix(".wav") { codecArg = "-c:a pcm_s16le" }
 
         let command =
-          "-y -ss \(start) -t \(duration) -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 \(codecArg) \"\(outputFile.path)\""
+          "-y -ss \(start) -t \(duration) -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
 
         FFmpegKit.executeAsync(command) { session in
           let rc = session?.getReturnCode()
