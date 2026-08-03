@@ -97,7 +97,7 @@ class UrlLauncherService {
   }
 
   Future<void> launchPrivacyPolicy(BuildContext context) async {
-    String url = "https://flik.me/pages/copy-of-privacy-policy";
+    String url = "https://flik.me/pages/flatch-privacy-policy";
     try {
       showDialog(context: context, builder: (context) => const LoadingDialog());
       bool canLaunch = await canLaunchUrl(Uri.parse(url));

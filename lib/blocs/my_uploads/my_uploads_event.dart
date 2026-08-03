@@ -21,8 +21,13 @@ final class FetchMoreUploads extends MyUploadsEvent {
 final class DeleteUpload extends MyUploadsEvent {
   final String id;
 
-  const DeleteUpload({required this.id});
+  /// When true, only the user's own library entry is removed and a public fart
+  /// is left live in the community. When false, the fart is deleted everywhere.
+  final bool libraryOnly;
+
+  const DeleteUpload({required this.id, this.libraryOnly = false});
 }
+
 final class EditUploadName extends MyUploadsEvent {
   final String id;
   final String newName;

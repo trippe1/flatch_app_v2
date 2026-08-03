@@ -4,40 +4,41 @@ extension AuthExceptionsHandler on FirebaseAuthException {
   String authError() {
     switch (code) {
       case 'email-already-in-use':
-        return "📧 This email is already taken. Try another one!";
+        return "That email is already registered.";
       case 'invalid-email':
-        return "❌ That email doesn't look right. Double-check it!";
+        return "That email address is not valid.";
       case 'operation-not-allowed':
-        return "🚫 Email/password sign-in isn't enabled. Turn it on!";
+        return "Email and password sign-in is not enabled.";
       case 'weak-password':
-        return "🛡️ Your password needs to be stronger!";
+        return "That password does not meet requirements.";
       case 'user-not-found':
-        return "🔍 No account found for that email. Try signing up!";
+        return "No account exists for that email.";
       case 'wrong-password':
-        return "🔐 Oops! Wrong password or user not exists. Try again!";
+        return "Incorrect email or password.";
       case 'user-disabled':
-        return "🚫 This account has been disabled. Contact support.";
+        return "This account has been disabled. Contact support.";
       case 'too-many-requests':
-        return "🕒 Too many attempts. Take a breather and try later!";
+        return "Too many attempts. Try again later.";
       case 'invalid-verification-code':
-        return "📲 Invalid verification code. Check your messages!";
+        return "The verification code is invalid.";
       case 'invalid-verification-id':
-        return "🆔 Invalid verification ID. Try again!";
+        return "The verification ID is invalid.";
       case 'invalid-credential':
-        return "🆔 Invalid email ID or password. Try again!";
+        return "Incorrect email or password.";
       case "network-request-failed":
-        return "📶 Network request failed, or network error occured.";
+        return "Network error. Check your connection and retry.";
       case "not-a-company-account":
-        return "🚫 This account is not a company account. Please recheck your email address";
+        return "This is not a company account. Verify the email address.";
       case "user-is-company-admin":
-        return "🚫 This account is a company admin account. Please recheck your email address or continue with individual login";
+        return "This is a company admin account. Verify the email address, "
+            "or continue with individual login.";
       case "company-code-not-found":
-        return "❌ Invalid company code. Please check your company code and try again!";
+        return "Invalid company code. Verify it and try again.";
       default:
         // Surface the real code/message so failures (e.g. Play Integrity /
         // reCAPTCHA attestation on devices without Google Play, or a blocked
         // Firestore/Auth endpoint) are diagnosable instead of hidden.
-        return "⚠️ Something went wrong. Please try again!"
+        return "The request could not be completed."
             "\n(code: $code${message != null ? " — $message" : ""})";
     }
   }

@@ -7,8 +7,14 @@ import 'package:flatch/common/models/fart_model.dart';
 import 'package:flatch/common/services/firestore_services.dart';
 import 'package:flatch/common/services/share_service.dart';
 import 'package:flatch/common/widgets/fart_preview.dart';
+import 'package:flatch/blocs/moderation_queue/moderation_queue_bloc.dart';
+import 'package:flatch/views/about/about_screen.dart';
+import 'package:flatch/views/age_gate/age_gate_screen.dart';
+import 'package:flatch/views/home/stock_sounds_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flatch/views/admin_app/assign_users.dart';
 import 'package:flatch/views/admin_app/fetch_all_sounds.dart';
+import 'package:flatch/views/admin_app/moderation_queue.dart';
 import 'package:flatch/views/admin_app/selection_page.dart';
 import 'package:flatch/views/dashboard/view.dart';
 import 'package:flatch/views/delete_account/delete_account.dart';
@@ -18,7 +24,12 @@ import 'package:flatch/views/forgot_password/view.dart';
 import 'package:flatch/views/home/banned_view.dart';
 import 'package:flatch/views/home/buy_device.dart';
 import 'package:flatch/views/home/comment_fart.dart';
+import 'package:flatch/views/home/edit_fart.dart';
 import 'package:flatch/views/home/home_view.dart';
+import 'package:flatch/views/fwb/fwb_home_screen.dart';
+import 'package:flatch/views/fwb/fwb_create_screen.dart';
+import 'package:flatch/views/fwb/fwb_chat_screen.dart';
+import 'package:flatch/views/fwb/fwb_join_screen.dart';
 
 import 'package:flatch/views/login/view.dart';
 import 'package:flatch/views/profile/contact_us.dart';
@@ -30,6 +41,7 @@ import 'package:flatch/views/update_profile/password_update.dart';
 import 'package:flatch/views/update_profile/update_account.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -40,57 +52,34 @@ enum AppRoute {
   splash,
   emailNotVerified,
   userSubscriptionEnded,
-  chooseDestination,
-  userAppDashboard,
   forgotPasswordView,
-  choosetheRole,
-  visaEligibilityCheck,
-  visaEligibilityResult,
-  searchaConsultant,
-  chatScreen,
-  consultantChat,
   home,
-  consultantHome,
   intro,
   login,
   signup,
-  forgotPassword,
   dashboard,
-  profile,
-  settings,
-  notifications,
-  consultantNotification,
-  aboutUs,
   contactUs,
-  termsAndConditions,
-  privacyPolicy,
-  consultantDetailsScreen,
-  bookinNowScreen,
   updateProfile,
   updatePassword,
-  consultantProfile,
-  consultantGigs,
-  buildRoadmap,
-  customBooking,
-  allSuccessStories,
-  whenRoadmapSave,
-  assessment,
-  assessmentView,
-  testingChat,
   deleteAccount,
-  buildActualRoadmap,
-  whenActualRoadmapSaved,
-  webview,
-  documentView,
   emailVerificationScreen,
   myUploads,
   buyDevice,
   commentFart,
+  editFart,
   userProfileScreen,
   selectionPage,
   adminPanel,
   assignUserRole,
   bannedWall,
+  moderationQueue,
+  ageGate,
+  stockSounds,
+  about,
+  fwbHome,
+  fwbCreate,
+  fwbChat,
+  fwbJoin,
 }
 
 class AppRoutes {
@@ -101,49 +90,29 @@ class AppRoutes {
   static const String signup = '/signIn';
   static const String forgotPasswordView = '/forgot-password';
   static const String dashboard = '/dashboard';
-  static const String profile = '/profile';
-  static const String settings = '/settings';
-  static const String notifications = '/notifications';
-  static const String aboutUs = '/about-us';
   static const String contactUs = '/contact-us';
-  static const String termsAndConditions = '/terms-and-conditions';
-  static const String privacyPolicy = '/privacy-policy';
   static const String emailNotVerified = '/email-not-verified';
-  static const String choosetheRole = '/choosethe-role';
-  static const String consultantHome = '/consultant-home';
-  static const String visaEligibiltyCheck = '/visa-eligibility-check';
-  static const String visaEligibilityResult = '/visa-eligibility-result';
-  static const String searchaConsultant = '/search-a-consultant';
-  static const String consultantDetailsScreen = '/consultant-details-screen';
-  static const String chatScreen = '/chat-screen';
-  static const String bookinNowScreen = '/book-now-screen';
   static const String updateProfile = '/update-profile';
   static const String updatePassword = '/update-password';
-  static const String consultantChat = '/consultant-chat';
-  static const String consultantNotification = '/consultant-notification';
-  static const String consultantProfile = '/consultant-profile';
-  static const String consultantGigs = '/consultant-gigs';
-  static const String buildRoadmap = '/build-roadmap';
-  static const String customBooking = '/custom-booking';
-  static const String allSuccessStories = '/all-success-stories';
-  static const String whenRoadmapSave = '/when-roadmap-saved';
-  static const String assessment = '/assessment';
-  static const String assessmentView = '/assessment-view';
-  static const String testingChat = '/testing-chat';
   static const String deleteAccount = '/delete-account';
-  static const String buildActualRoadmap = '/build-actual-roadmap';
-  static const String whenActualRoadmapSaved = '/when-actual-roadmap-saved';
-  static const String webview = '/webview';
-  static const String documentView = '/document-view';
   static const String emailVerificationScreen = '/email-verification-screen';
   static const String myUploads = '/my-uploads';
   static const String buyDevice = '/buy-device';
   static const String commentFart = '/comment-fart';
+  static const String editFart = '/edit-fart';
   static const String userProfileScreen = '/user-profile-screen';
   static const String selectionPage = '/selection-page';
   static const String adminPanel = '/admin-panel';
   static const String assignUserRole = '/assign-user-role';
   static const String bannedWall = '/banned-wall';
+  static const String moderationQueue = '/moderation-queue';
+  static const String ageGate = '/age-gate';
+  static const String stockSounds = '/stock-sounds';
+  static const String about = '/about';
+  static const String fwbHome = '/fwb';
+  static const String fwbCreate = '/fwb/create';
+  static const String fwbChat = '/fwb/chat';
+  static const String fwbJoin = '/fwb/:groupId';
 
   static FutureOr<String?> guard(
     BuildContext context,
@@ -155,41 +124,48 @@ class AppRoutes {
     }
 
     final User? user = FirebaseAuth.instance.currentUser;
-    print("user: $user");
 
-    if (user != null) {
-      final querySnapshot =
-          await FirebaseFirestore.instance
-              .collection('app_users')
-              .where('uid', isEqualTo: user.uid)
-              .limit(1)
-              .get();
+    if (user == null) return null;
+
+    try {
+      // Time-box the profile lookups. This redirect runs while the splash is on
+      // screen; a pending async redirect keeps the *current* page visible, so a
+      // stalled Firestore call (offline, App Check latency, transient error)
+      // would trap the user on the splash forever. Never let that happen.
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('app_users')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 8));
 
       if (querySnapshot.docs.isEmpty) {
-        print("No user found with uid ${user.uid}");
         return router.namedLocation(AppRoute.intro.name);
       }
 
       final userData = querySnapshot.docs.first.data();
       final String? role = userData['role'];
-      final supportSnap =
-          await FirebaseFirestore.instance
-              .collection('contact_support')
-              .limit(1)
-              .get();
-
-      String supportEmail = "";
-
-      if (supportSnap.docs.isNotEmpty) {
-        supportEmail =
-            supportSnap.docs.first.data()['supportEmail'] ?? supportEmail;
-      }
 
       final bool isBan = userData['isBan'] == true;
       final int? bannedAt = userData['bannedAt'];
       final String banReason = userData['banReason'] ?? "No reason provided";
 
       if (isBan) {
+        // The support email is a nicety on the ban wall — best-effort, and it
+        // must not gate the redirect if that read is slow.
+        String supportEmail = "";
+        try {
+          final supportSnap = await FirebaseFirestore.instance
+              .collection('contact_support')
+              .limit(1)
+              .get()
+              .timeout(const Duration(seconds: 5));
+          if (supportSnap.docs.isNotEmpty) {
+            supportEmail =
+                supportSnap.docs.first.data()['supportEmail'] ?? supportEmail;
+          }
+        } catch (_) {}
+
         return "/banned?"
             "bannedAt=$bannedAt"
             "&banReason=${Uri.encodeComponent(banReason)}"
@@ -197,26 +173,32 @@ class AppRoutes {
       }
 
       if (role == null) {
-        print("User role not found");
         return router.namedLocation(AppRoute.intro.name);
       }
 
       final claims = CustomClaims(role: role);
-      print("User role: $role");
-      print("User claims: ${claims.isAdmin}");
 
-      if (!user.emailVerified) {
-        return router.namedLocation(AppRoute.emailVerificationScreen.name);
-      } else if (claims.isAdmin) {
+      // Email verification is enforced at the point of POSTING (see
+      // EmailVerificationGate), not here — an unverified user may browse,
+      // listen, and use their Flatch device.
+      if (claims.isAdmin) {
         return router.namedLocation(AppRoute.selectionPage.name);
-      } else if (claims.isConsultant) {
-        return router.namedLocation(AppRoute.consultantHome.name);
       } else {
         return router.namedLocation(AppRoute.home.name);
       }
+    } catch (e, st) {
+      // Profile lookup stalled or failed. Don't strand the user on the splash —
+      // let them into the app (ban/role checks re-run on the next guarded
+      // navigation). Record it so we can see if this fires in the wild.
+      debugPrint("Router guard fallback → home: $e");
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        st,
+        reason: 'router guard fallback',
+        fatal: false,
+      );
+      return router.namedLocation(AppRoute.home.name);
     }
-
-    return null;
   }
 
   static GoRouter router = GoRouter(
@@ -262,6 +244,65 @@ class AppRoutes {
       ),
 
       GoRoute(
+        path: ageGate,
+        name: AppRoute.ageGate.name,
+        builder: (context, state) => const AgeGateScreen(),
+      ),
+
+      GoRoute(
+        path: stockSounds,
+        name: AppRoute.stockSounds.name,
+        builder: (context, state) => const StockSoundsScreen(),
+      ),
+
+      GoRoute(
+        path: about,
+        name: AppRoute.about.name,
+        builder: (context, state) => const AboutScreen(),
+      ),
+
+      // Farts with Buddies. Declare the static sub-paths before the
+      // `/fwb/:groupId` invite route so they aren't swallowed as a groupId.
+      GoRoute(
+        path: fwbHome,
+        name: AppRoute.fwbHome.name,
+        builder: (context, state) => const FwbHomeScreen(),
+      ),
+      GoRoute(
+        path: fwbCreate,
+        name: AppRoute.fwbCreate.name,
+        builder: (context, state) => const FwbCreateScreen(),
+      ),
+      GoRoute(
+        path: fwbChat,
+        name: AppRoute.fwbChat.name,
+        builder: (context, state) {
+          final groupId = state.extra as String;
+          return FwbChatScreen(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: fwbJoin,
+        name: AppRoute.fwbJoin.name,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId']!;
+          return FwbJoinScreen(groupId: groupId);
+        },
+      ),
+
+      GoRoute(
+        path: moderationQueue,
+        name: AppRoute.moderationQueue.name,
+        builder:
+            (context, state) => BlocProvider(
+              create:
+                  (_) =>
+                      ModerationQueueBloc()..add(const FetchModerationQueue()),
+              child: const ModerationQueuePage(),
+            ),
+      ),
+
+      GoRoute(
         path: splash,
         name: AppRoute.splash.name,
         builder: (context, state) => SplashView(),
@@ -295,6 +336,17 @@ class AppRoutes {
             (context, state) => const CupertinoPage(child: ContactUsScreen()),
       ),
 
+      GoRoute(
+        path: editFart,
+        name: AppRoute.editFart.name,
+        pageBuilder: (context, state) {
+          final fart = state.extra as FartModel;
+          return CupertinoPage(
+            key: state.pageKey,
+            child: EditFartScreen(fart: fart),
+          );
+        },
+      ),
       GoRoute(
         path: commentFart,
         name: AppRoute.commentFart.name,

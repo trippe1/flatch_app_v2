@@ -1,0 +1,12 @@
+{
+  "name": "flatch-moderation",
+  "description": "Content moderation for Flatch uploads (multimodal, Gemini/Vertex AI)",
+  "engines": { "node": "20" },
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.0",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

@@ -168,7 +168,7 @@ import ffmpegkit
         if outputFile.path.hasSuffix(".wav") { codecArg = "-c:a pcm_s16le" }
 
         let command =
-          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
+          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 22050 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
 
         FFmpegKit.executeAsync(command) { session in
           let rc = session?.getReturnCode()
@@ -213,7 +213,7 @@ import ffmpegkit
         if outputFile.path.hasSuffix(".wav") { codecArg = "-c:a pcm_s16le" }
 
         let command =
-          "-y -ss \(start) -t \(duration) -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
+          "-y -ss \(start) -t \(duration) -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 22050 -af loudnorm=I=-14:TP=-1.0:LRA=11 \(codecArg) \"\(outputFile.path)\""
 
         FFmpegKit.executeAsync(command) { session in
           let rc = session?.getReturnCode()
@@ -224,6 +224,67 @@ import ffmpegkit
               (try? session?.getAllLogsAsString()) ?? (try? session?.getOutput()) ?? "Unknown error"
             DispatchQueue.main.async {
               result(FlutterError(code: "FFMPEG_ERROR", message: "Trim failed", details: failStack))
+            }
+          }
+        }
+
+      case "applyAudioFilter":
+        guard
+          let args = call.arguments as? [String: Any],
+          let inputPath = args["inputPath"] as? String,
+          let filter = args["filter"] as? String
+        else {
+          result(
+            FlutterError(code: "INVALID_ARGS", message: "Missing input path or filter", details: nil))
+          return
+        }
+        let outputExt = args["outputExt"] as? String ?? "mp3"
+        let outputFile = self.getUsbDir().appendingPathComponent(
+          "fx_\(Int(Date().timeIntervalSince1970)).\(outputExt)"
+        )
+        if FileManager.default.fileExists(atPath: outputFile.path) {
+          try? FileManager.default.removeItem(at: outputFile)
+        }
+        var fxCodec = "-c:a aac"
+        if outputFile.path.hasSuffix(".mp3") { fxCodec = "-c:a libmp3lame -q:a 2" }
+        if outputFile.path.hasSuffix(".wav") { fxCodec = "-c:a pcm_s16le" }
+        let fxCommand =
+          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar 22050 -af \"\(filter),loudnorm=I=-14:TP=-1.0:LRA=11\" \(fxCodec) \"\(outputFile.path)\""
+        FFmpegKit.executeAsync(fxCommand) { session in
+          let rc = session?.getReturnCode()
+          if rc?.isValueSuccess() == true {
+            DispatchQueue.main.async { result(outputFile.path) }
+          } else {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "FFMPEG_ERROR", message: "Effect failed", details: nil))
+            }
+          }
+        }
+
+      case "extractPcm":
+        guard
+          let args = call.arguments as? [String: Any],
+          let inputPath = args["inputPath"] as? String
+        else {
+          result(FlutterError(code: "INVALID_ARGS", message: "Missing input path", details: nil))
+          return
+        }
+        let sr = args["sampleRate"] as? Int ?? 8000
+        let pcmFile = self.getUsbDir().appendingPathComponent(
+          "wave_\(Int(Date().timeIntervalSince1970)).pcm"
+        )
+        if FileManager.default.fileExists(atPath: pcmFile.path) {
+          try? FileManager.default.removeItem(at: pcmFile)
+        }
+        let pcmCommand =
+          "-y -i \"\(inputPath)\" -vn -map a:0? -ac 1 -ar \(sr) -f s16le \"\(pcmFile.path)\""
+        FFmpegKit.executeAsync(pcmCommand) { session in
+          let rc = session?.getReturnCode()
+          if rc?.isValueSuccess() == true {
+            DispatchQueue.main.async { result(pcmFile.path) }
+          } else {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "FFMPEG_ERROR", message: "PCM extract failed", details: nil))
             }
           }
         }

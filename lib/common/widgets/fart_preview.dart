@@ -75,7 +75,7 @@ class _FartPreviewScreenState extends State<FartPreviewScreen> {
           onShare: () async {
             await ShareService.instance.shareFart(
               fartId: fart.id,
-              title: 'Listen to this fart!',
+              title: 'For your review.',
             );
           },
           onUserTap: () {

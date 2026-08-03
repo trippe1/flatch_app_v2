@@ -8,6 +8,7 @@ import 'package:flatch/blocs/my_uploads/my_uploads_bloc.dart';
 import 'package:flatch/common/color/app_colors.dart';
 import 'package:flatch/common/extensions/media_query_extension.dart';
 import 'package:flatch/common/models/fart_model.dart';
+import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/toast_service.dart';
 import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flatch/cubits/flatch_ble/flatch_ble_cubit.dart';
@@ -15,6 +16,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:toastification/toastification.dart';
@@ -34,7 +37,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
   @override
   void initState() {
     context.read<MyUploadsBloc>().add(FetcnInitialUploads());
-
+    // Bring up the radio here — NOT at app launch — so the OS Bluetooth prompt
+    // only appears when the user actually opens the device page.
+    context.read<FlatchBleCubit>().startBle();
     super.initState();
   }
 
@@ -57,6 +62,13 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
         ),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Built-in sounds',
+            icon: const Icon(Icons.library_music_outlined),
+            onPressed: () => context.pushNamed(AppRoute.stockSounds.name),
+          ),
+        ],
       ),
       body: BlocListener<FlatchBleCubit, FlatchBleState>(
         listener: (context, state) {
@@ -94,6 +106,51 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
     );
   }
 
+  /// Explains why pairing happens in-app and what to do when the device's
+  /// signal times out. Dismissed by the X or by tapping anywhere outside.
+  void _showBluetoothInfoDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true, // tap anywhere off the bubble to close
+      builder:
+          (dialogContext) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 28,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 46, 20, 22),
+                  child: Text(
+                    'We can only connect your Flatch device within the app '
+                    'because each Flatch has a unique encrypted connection '
+                    'with the app.\n\n'
+                    'The Flatch bluetooth signal turns off after two minutes '
+                    'of searching for the app to preserve battery power. '
+                    'Simply turn the device off and on again to connect to '
+                    'Bluetooth.',
+                    style: TextStyle(fontSize: 14.5, height: 1.5),
+                  ),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: IconButton(
+                    tooltip: 'Close',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
   void _showDownloadDialog(BuildContext context, int slot) {
     _isDownloadingDialogOpen = true;
 
@@ -104,11 +161,11 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text("Downloading"),
+              title: const Text("Retrieving"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text("Downloading sound from slot $slot..."),
+                  Text("Retrieving sound from slot $slot…"),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -147,14 +204,11 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text("Download Complete"),
+            title: const Text("Retrieval complete."),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "The file has been saved successfully!",
-                  textAlign: TextAlign.center,
-                ),
+                const Text("File saved.", textAlign: TextAlign.center),
                 const SizedBox(height: 10),
                 Text(
                   fileName,
@@ -264,7 +318,10 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
 
   Widget _buildScanUI(BuildContext context, FlatchBleState state) {
     final isLoading = state.isLoading;
-    final isOn = state.isBluetoothOn;
+    // Only treat Bluetooth as "off" when the adapter explicitly reports off —
+    // not when its state is merely undetermined (iOS reports 'unknown' until
+    // BLE is first used).
+    final isOff = state.isBluetoothOff;
     final isConnecting = state.isConnecting;
 
     return SafeArea(
@@ -272,36 +329,112 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _showBluetoothInfoDialog(context),
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text:
+                                      'Turn on your Flatch and slide the on '
+                                      'switch to the On ',
+                                ),
+                                _wirelessGlyph(),
+                                const TextSpan(
+                                  text:
+                                      ' position, then tap Scan. Pair here in '
+                                      "the app — not in your phone's settings.",
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Grant/enable Bluetooth right here rather than sending the
+                  // user off to system Settings.
+                  if (state.blePermissionDenied || state.isBluetoothOff) ...[
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        final cubit = context.read<FlatchBleCubit>();
+                        if (state.blePermissionPermanentlyDenied) {
+                          cubit.openBleSettings();
+                        } else {
+                          cubit.requestBleAccess();
+                        }
+                      },
+                      icon: const Icon(Icons.bluetooth_searching),
+                      label: Text(
+                        state.blePermissionPermanentlyDenied
+                            ? 'Open Settings to allow Bluetooth'
+                            : 'Allow Bluetooth',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.primary,
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   ElevatedButton.icon(
                     onPressed:
                         isLoading
                             ? null
                             : () =>
-                                context.read<FlatchBleCubit>().scanDevices(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Refresh"),
+                                context.read<FlatchBleCubit>().requestBleAccess(),
+                    icon: const Icon(Icons.search),
+                    label: Text(isLoading ? 'Scanning…' : 'Scan for my Flatch'),
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
                       backgroundColor: AppColors.primary,
+                      minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          if (!isOn)
+          if (isOff)
             SliverFillRemaining(
-              child: _buildCenterText("Bluetooth is off. Turn it on"),
+              child: _buildCenterText(
+                "Bluetooth is disabled. Enable it to proceed.",
+              ),
             )
           else if (isConnecting)
             SliverFillRemaining(
               child: Column(
                 children: [
-                  _buildCenterText("Connecting to device..."),
+                  _buildCenterText(
+                    state.statusMessage.isEmpty
+                        ? "Connecting to your Flatch…"
+                        : state.statusMessage,
+                  ),
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: 1),
                     duration: const Duration(milliseconds: 800),
@@ -324,21 +457,29 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           else if (state.error != null)
             SliverFillRemaining(child: _buildErrorWithRetry(context, state))
           else if (!isLoading && state.devices.isEmpty)
-            SliverFillRemaining(child: _buildCenterText("No devices found"))
+            SliverFillRemaining(child: _buildNoDevices(context))
           else if (!isLoading)
             SliverList(
               delegate: SliverChildBuilderDelegate((_, index) {
                 final d = state.devices[index];
+                // Every listed device is already filtered to Flatch. Show the
+                // advertised per-unit name (e.g. "Flatch-1A2B"); if firmware
+                // still advertises the legacy "Latch …" name, present "Flatch".
+                final adv =
+                    d.platformName.isNotEmpty ? d.platformName : d.advName;
                 final name =
-                    d.advName.toLowerCase().startsWith('latch')
+                    adv.isEmpty
                         ? 'Flatch'
-                        : (d.advName.isNotEmpty
-                            ? d.advName
-                            : d.remoteId.toString());
+                        : (adv.toLowerCase().startsWith('latch')
+                            ? 'Flatch'
+                            : adv);
+                final rssi = state.deviceRssi[d.remoteId.str];
 
                 return ListTile(
-                  leading: const Icon(Icons.bluetooth),
+                  leading: const Icon(Icons.speaker, color: Colors.deepPurple),
                   title: Text(name),
+                  subtitle: rssi == null ? null : Text(_signalLabel(rssi)),
+                  trailing: _SignalBars(rssi: rssi),
                   onTap: () => context.read<FlatchBleCubit>().connectDevice(d),
                 );
               }, childCount: state.devices.length),
@@ -354,25 +495,172 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
 
   Widget _buildErrorWithRetry(BuildContext context, FlatchBleState state) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+            const SizedBox(height: 12),
+            const Text(
+              "The device could not be reached.",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.error ?? 'Something went wrong.',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Tip: pair your Flatch here in the app, not in your phone’s '
+                'Bluetooth settings. If you already tried pairing in Settings, '
+                'open Settings → Bluetooth → your Flatch → "Forget '
+                'This Device", then scan again here.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text("Scan again"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => context.read<FlatchBleCubit>().scanDevices(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoDevices(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SvgPicture.asset(
+              'assets/svgs/device_signal.svg',
+              width: 48,
+              height: 48,
+              colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No device located.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            // Most common cause now that the device powers its radio down:
+            // it has simply been on too long. Lead with it.
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Has your Flatch been on for more than 2 minutes? Its '
+                'Bluetooth switches off to save battery. Turn the Flatch off '
+                'and on again, then scan.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, height: 1.35),
+              ),
+            ),
+            ..._tipRich(
+              TextSpan(
+                children: [
+                  const TextSpan(
+                    text: 'Is your Flatch on? Slide the on switch to the On ',
+                  ),
+                  _wirelessGlyph(size: 13, color: Colors.grey),
+                  const TextSpan(text: ' position.'),
+                ],
+              ),
+            ),
+            ..._tip('Is it within a few feet of your phone?'),
+            ..._tip('Is it charged? Charge it, then scan again.'),
+            const SizedBox(height: 8),
+            const Text(
+              'Pair here in the app, not in phone Settings.',
+              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('Scan again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => context.read<FlatchBleCubit>().scanDevices(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _tip(String text) => [
+    Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
-          const SizedBox(height: 12),
-          Text(
-            state.error ?? 'Unknown error',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.refresh),
-            label: const Text("Retry"),
-            onPressed: () {
-              context.read<FlatchBleCubit>().scanDevices();
-            },
+          const Text('•  '),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    ),
+  ];
+
+  /// Like [_tip] but takes rich content (so an inline glyph can be embedded).
+  List<Widget> _tipRich(InlineSpan span) => [
+    Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('•  '),
+          Expanded(
+            child: Text.rich(span, style: const TextStyle(fontSize: 13)),
           ),
         ],
+      ),
+    ),
+  ];
+
+  /// Inline wireless glyph for use inside a [TextSpan] (the "On" position mark).
+  /// Matches the device-tab / bottom-nav wireless icon — deliberately NOT the
+  /// Bluetooth figure mark, which is a trademark we can't use.
+  WidgetSpan _wirelessGlyph({
+    double size = 15,
+    Color color = AppColors.primary,
+  }) {
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: SvgPicture.asset(
+          'assets/svgs/device_signal.svg',
+          width: size,
+          height: size,
+          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        ),
       ),
     );
   }
@@ -450,7 +738,7 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
             child: ElevatedButton.icon(
               icon: const Icon(Icons.sync),
               label: const Text(
-                'Sync to Flatch',
+                'Deploy to Flatch',
                 style: TextStyle(fontSize: 14),
               ),
               onPressed: () async {
@@ -468,13 +756,13 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
                 if (isSuccess) {
                   showToast(
                     context: context,
-                    message: 'Sync completed successfully',
+                    message: 'Deployment complete.',
                     type: ToastificationType.success,
                   );
                 } else {
                   showToast(
                     context: context,
-                    message: 'Sync failed',
+                    message: 'Deployment failed.',
                     type: ToastificationType.error,
                   );
                 }
@@ -758,6 +1046,49 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---- Signal strength (RSSI) helpers for the pairing list ----
+
+String _signalLabel(int rssi) {
+  if (rssi >= -60) return 'Strong signal · very close';
+  if (rssi >= -75) return 'Good signal';
+  return 'Weak signal · move closer';
+}
+
+class _SignalBars extends StatelessWidget {
+  final int? rssi;
+  const _SignalBars({required this.rssi});
+
+  @override
+  Widget build(BuildContext context) {
+    // Map RSSI (dBm) to 0–3 bars: >=-60 strong, >=-75 good, else weak.
+    final r = rssi;
+    final level =
+        r == null
+            ? 0
+            : r >= -60
+            ? 3
+            : r >= -75
+            ? 2
+            : 1;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(3, (i) {
+        final active = i < level;
+        return Container(
+          width: 5,
+          height: 8.0 + i * 5,
+          margin: const EdgeInsets.only(left: 2),
+          decoration: BoxDecoration(
+            color: active ? Colors.deepPurple : Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(1),
+          ),
+        );
+      }),
     );
   }
 }

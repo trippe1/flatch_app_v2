@@ -6,15 +6,69 @@ import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flatch/common/enums/fart_filters.dart';
+import 'package:flatch/common/logics/search_tokens.dart';
 import 'package:flatch/common/models/comment_model.dart';
 import 'package:flatch/common/models/fart_model.dart';
 
 part 'fetch_farts_event.dart';
 part 'fetch_farts_state.dart';
 
+/// Applies the sort for [filter] to a `user_farts` query at the DATABASE level,
+/// so paging fetches the globally correct set (not just a client re-sort of one
+/// page). "Popular" orders by `hotScore` — the Reddit-style ranking kept up to
+/// date server-side (see `syncFartIndex` in functions/index.js). Controversial
+/// still pages by upvotes and is refined client-side over the fetched window.
+Query _applyFeedSort(Query q, FartFilter filter) {
+  switch (filter) {
+    case FartFilter.newest:
+      return q.orderBy('createdAt', descending: true);
+    case FartFilter.oldest:
+      return q.orderBy('createdAt', descending: false);
+    case FartFilter.popular:
+    case FartFilter.sortBy:
+      return q.orderBy('hotScore', descending: true);
+    case FartFilter.controversial:
+    case FartFilter.all:
+    case FartFilter.flagged:
+      return q.orderBy('upvotes', descending: true);
+  }
+}
+
+/// Docs written before `hotScore` existed are invisible to an orderBy on it
+/// (Firestore skips docs missing the field). If a hot-ranked query comes back
+/// empty we fall back to upvotes so the feed is never blank before the
+/// one-time backfill has run.
+bool _isHotRanked(FartFilter f) =>
+    f == FartFilter.popular || f == FartFilter.sortBy;
+
+/// Keeps only docs whose `searchTokens` contain EVERY query token. The query
+/// itself can only enforce the first one, so a multi-word search ("uncle bob")
+/// is narrowed here.
+List<QueryDocumentSnapshot> _matchAllTokens(
+  List<QueryDocumentSnapshot> docs,
+  List<String> tokens,
+) {
+  if (tokens.length < 2) return docs;
+  final rest = tokens.skip(1);
+  return docs.where((d) {
+    final data = d.data() as Map<String, dynamic>?;
+    final raw = data?['searchTokens'];
+    if (raw is! List) return false;
+    final have = raw.whereType<String>().toSet();
+    return rest.every(have.contains);
+  }).toList();
+}
+
 class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+
+  // Remembers the active feed sort/search so paging (FetchMoreFarts, driven by
+  // scroll) keeps the same ordering as the initial FetchTopFarts.
+  FartFilter _activeFilter = FartFilter.sortBy;
+  List<String> _activeTokens = const [];
+  bool _activeHotFallback = false;
 
   /// [firestore] and [auth] are injectable for tests; they default to the real
   /// singletons so production wiring (`FetchFartsBloc()`) is unchanged.
@@ -36,19 +90,35 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
           return;
         }
 
-        Query query = _firestore
-            .collection('user_farts')
-            .where('isPublic', isEqualTo: true)
-            .orderBy('upvotes', descending: true)
-            .limit(limit);
+        _activeFilter = event.filter;
+        _activeTokens = tokenizeSearch(event.searchQuery ?? '');
+        _activeHotFallback = false;
 
-        if (event.category != null && event.category!.isNotEmpty) {
-          query = query.where('category', isEqualTo: event.category);
+        Query base = _firestore
+            .collection('user_farts')
+            .where('isPublic', isEqualTo: true);
+
+        // Search: Firestore can only match one array-contains per query, so we
+        // filter on the first token server-side and require the rest below.
+        if (_activeTokens.isNotEmpty) {
+          base = base.where('searchTokens', arrayContains: _activeTokens.first);
         }
 
-        final snapshot = await query.get();
+        var snapshot = await _applyFeedSort(base, event.filter)
+            .limit(limit)
+            .get();
 
-        final farts = await _enrichFarts(snapshot.docs, userId);
+        // Pre-backfill safety net (see _isHotRanked).
+        if (snapshot.docs.isEmpty && _isHotRanked(event.filter)) {
+          _activeHotFallback = true;
+          snapshot = await base
+              .orderBy('upvotes', descending: true)
+              .limit(limit)
+              .get();
+        }
+
+        final docs = _matchAllTokens(snapshot.docs, _activeTokens);
+        final farts = await _enrichFarts(docs, userId);
 
         emit(
           FetchFartsSuccess(
@@ -70,15 +140,24 @@ class FetchFartsBloc extends Bloc<FetchFartsEvent, FetchFartsState> {
         final userId = _auth.currentUser?.uid;
         if (userId == null) return;
 
-        final query = _firestore
+        Query query = _firestore
             .collection('user_farts')
-            .where('isPublic', isEqualTo: true)
-            .orderBy('upvotes', descending: true)
-            .startAfterDocument(event.lastDoc)
-            .limit(limit);
+            .where('isPublic', isEqualTo: true);
+
+        if (_activeTokens.isNotEmpty) {
+          query = query.where('searchTokens', arrayContains: _activeTokens.first);
+        }
+
+        query =
+            (_activeHotFallback
+                    ? query.orderBy('upvotes', descending: true)
+                    : _applyFeedSort(query, _activeFilter))
+                .startAfterDocument(event.lastDoc)
+                .limit(limit);
 
         final snapshot = await query.get();
-        final farts = await _enrichFarts(snapshot.docs, userId);
+        final docs = _matchAllTokens(snapshot.docs, _activeTokens);
+        final farts = await _enrichFarts(docs, userId);
 
         emit(
           FetchFartsSuccess(

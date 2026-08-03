@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flatch/blocs/my_uploads/my_uploads_bloc.dart';
 import 'package:flatch/common/color/app_colors.dart';
+import 'package:flatch/common/services/library_order_service.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/audio_cache_service.dart';
 import 'package:flatch/common/services/share_service.dart';
@@ -17,23 +18,63 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flatch/common/models/fart_model.dart';
 
-class MyUploadsScreen extends StatefulWidget {
+/// Standalone route: My Fart Library with its own app bar. The list body lives
+/// in [MyUploadsListView] so it can also be embedded (e.g. under the upload
+/// tiles in the + module).
+class MyUploadsScreen extends StatelessWidget {
   const MyUploadsScreen({super.key});
 
   @override
-  State<MyUploadsScreen> createState() => _MyUploadsScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Fart Library'),
+        leading: IconButton(
+          style: ButtonStyle().copyWith(
+            backgroundColor: WidgetStatePropertyAll(Colors.transparent),
+            side: WidgetStatePropertyAll(BorderSide.none),
+          ),
+          onPressed: () => GoRouter.of(context).pop(),
+          icon: const Icon(Icons.arrow_back),
+        ),
+      ),
+      body: const MyUploadsListView(),
+    );
+  }
 }
 
-class _MyUploadsScreenState extends State<MyUploadsScreen> {
+/// The My Fart Library list. Full feature set — play/pause, rename (mine),
+/// delete (mine), share, comments, pagination.
+///
+/// * Standalone (`embedded: false`): owns its scroll + infinite-scroll paging.
+/// * Embedded (`embedded: true`): lays out inline inside a parent scroll view
+///   (shrink-wrapped, no inner scroll) and pages via a "Load more" button.
+class MyUploadsListView extends StatefulWidget {
+  final bool embedded;
+  const MyUploadsListView({super.key, this.embedded = false});
+
+  @override
+  State<MyUploadsListView> createState() => _MyUploadsListViewState();
+}
+
+class _MyUploadsListViewState extends State<MyUploadsListView> {
   final ScrollController _scrollController = ScrollController();
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<PlayerState>? _playerSub;
   String? _currentlyPlayingUrl;
 
+  // The user's hand-arranged order (fart ids). Empty until loaded / until they
+  // have actually dragged something.
+  List<String> _order = const [];
+
   @override
   void initState() {
     super.initState();
     context.read<MyUploadsBloc>().add(FetcnInitialUploads());
+
+    LibraryOrderService.load().then((o) {
+      if (mounted && o.isNotEmpty) setState(() => _order = o);
+    });
 
     _playerSub = _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
@@ -43,17 +84,19 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
       }
     });
 
-    _scrollController.addListener(() {
-      final bloc = context.read<MyUploadsBloc>();
-      final state = bloc.state;
-
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent - 200) {
-        if (state is MyUploadsLoaded && state.hasMore) {
-          bloc.add(FetchMoreUploads(state.lastDoc!));
+    // Infinite scroll only makes sense when we own the scroll view.
+    if (!widget.embedded) {
+      _scrollController.addListener(() {
+        final bloc = context.read<MyUploadsBloc>();
+        final state = bloc.state;
+        if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200) {
+          if (state is MyUploadsLoaded && state.hasMore) {
+            bloc.add(FetchMoreUploads(state.lastDoc!));
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   @override
@@ -152,6 +195,24 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
     );
   }
 
+  /// Commits a drag. Persists the new arrangement so it survives app restarts,
+  /// merging with any ordered-but-not-yet-loaded items so pagination doesn't
+  /// quietly discard their positions.
+  Future<void> _onReorder(List<FartModel> visible, int oldIndex, int newIndex) async {
+    // ReorderableListView reports the target index BEFORE the item is removed.
+    if (newIndex > oldIndex) newIndex -= 1;
+    final reordered = [...visible];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    final merged = LibraryOrderService.merge(
+      reordered.map((f) => f.id).toList(),
+      _order,
+    );
+    setState(() => _order = merged);
+    await LibraryOrderService.save(merged);
+  }
+
   Widget _buildItem(FartModel fart) {
     final isPlaying = _currentlyPlayingUrl == fart.fileUrl;
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
@@ -173,15 +234,28 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
                   color: Colors.grey,
                 ),
               ),
-              isMine
-                  ? IconButton(
-                    onPressed:
-                        isMine
-                            ? () => _showEditNameDialog(context, fart)
-                            : null,
-                    icon: Icon(Icons.edit, color: AppColors.primary),
-                  )
-                  : SizedBox.shrink(),
+              if (isMine)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Edit sound',
+                      onPressed:
+                          () => context.pushNamed(
+                            AppRoute.editFart.name,
+                            extra: fart,
+                          ),
+                      icon: Icon(Icons.tune_rounded, color: AppColors.primary),
+                    ),
+                    IconButton(
+                      tooltip: 'Rename',
+                      onPressed: () => _showEditNameDialog(context, fart),
+                      icon: Icon(Icons.edit, color: AppColors.primary),
+                    ),
+                  ],
+                )
+              else
+                const SizedBox.shrink(),
             ],
           ),
         ),
@@ -200,7 +274,7 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
           onShare: () async {
             await ShareService.instance.shareFart(
               fartId: fart.id,
-              title: 'Listen to this fart!',
+              title: 'For your review.',
             );
           },
           onCommentsTap: () {
@@ -216,6 +290,74 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
   }
 
   void _confirmAndDelete(BuildContext context, FartModel fart) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final ownPublic = fart.uid == currentUid && fart.isPublic;
+
+    final outlined = OutlinedButton.styleFrom(
+      side: BorderSide(color: AppColors.primary),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    );
+    final danger = ElevatedButton.styleFrom(
+      backgroundColor: Colors.red,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    );
+
+    // A public fart that you own is live in the community — offer to remove it
+    // from your library only, or delete it everywhere.
+    if (ownPublic) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder:
+            (ctx) => AlertDialog(
+              title: const Text('Delete public fart'),
+              content: const Text(
+                "This fart is live in the community. Remove it from your "
+                'library only, or delete it everywhere?',
+              ),
+              actionsPadding: const EdgeInsets.only(
+                right: 12,
+                left: 12,
+                bottom: 8,
+              ),
+              actions: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    OutlinedButton(
+                      style: outlined,
+                      onPressed: () => Navigator.of(ctx).pop('library'),
+                      child: const Text('Remove from my library only'),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      style: danger,
+                      onPressed: () => Navigator.of(ctx).pop('everywhere'),
+                      child: const Text(
+                        'Delete everywhere',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop('cancel'),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+      );
+      if (choice == 'library') {
+        context.read<MyUploadsBloc>().add(
+          DeleteUpload(id: fart.id, libraryOnly: true),
+        );
+      } else if (choice == 'everywhere') {
+        context.read<MyUploadsBloc>().add(DeleteUpload(id: fart.id));
+      }
+      return;
+    }
+
+    // Private / not-owned: a simple confirm.
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
@@ -227,23 +369,13 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+                    style: outlined,
                     onPressed: () => Navigator.of(ctx).pop(false),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+                    style: danger,
                     onPressed: () => Navigator.of(ctx).pop(true),
                     child: const Text(
                       'Delete',
@@ -268,56 +400,148 @@ class _MyUploadsScreenState extends State<MyUploadsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Fart Library'),
-        leading: IconButton(
-          style: ButtonStyle().copyWith(
-            backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-            side: WidgetStatePropertyAll(BorderSide.none),
-          ),
-          onPressed: () => GoRouter.of(context).pop(),
-          icon: const Icon(Icons.arrow_back),
-        ),
-      ),
-      body: BlocBuilder<MyUploadsBloc, MyUploadsState>(
-        builder: (context, state) {
-          if (state is MyUploadsLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is MyUploadsError) {
-            return Center(child: Text(state.message));
-          } else if (state is MyUploadsLoaded) {
-            final sortedUploads = [
-              ...state.uploads.where(
-                (f) => f.uid == FirebaseAuth.instance.currentUser?.uid,
+    return BlocBuilder<MyUploadsBloc, MyUploadsState>(
+      builder: (context, state) {
+        if (state is MyUploadsLoading) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        } else if (state is MyUploadsError) {
+          // Don't surface raw Firestore exceptions (e.g. transient
+          // "unavailable") — show a friendly message with a retry.
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 40,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Couldn't load your library.",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Check your connection and try again.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.primary),
+                    ),
+                    onPressed:
+                        () => context.read<MyUploadsBloc>().add(
+                          FetcnInitialUploads(),
+                        ),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-              ...state.uploads.where(
-                (f) => f.uid != FirebaseAuth.instance.currentUser?.uid,
-              ),
-            ];
-            if (sortedUploads.isEmpty) {
-              return const Center(child: Text('No uploads found.'));
-            }
-
-            return ListView.builder(
-              controller: _scrollController,
-              itemCount: sortedUploads.length + (state.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index < sortedUploads.length) {
-                  return _buildItem(sortedUploads[index]);
-                } else {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-              },
+            ),
+          );
+        } else if (state is MyUploadsLoaded) {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          // Default arrangement: the user's own sounds first. Once they have
+          // dragged anything, their order wins outright — re-grouping would
+          // fight the arrangement they just made.
+          final defaultOrder = [
+            ...state.uploads.where((f) => f.uid == uid),
+            ...state.uploads.where((f) => f.uid != uid),
+          ];
+          final sortedUploads = LibraryOrderService.apply<FartModel>(
+            defaultOrder,
+            _order,
+            (f) => f.id,
+          );
+          if (sortedUploads.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: Text('No uploads found.')),
             );
           }
 
-          return const SizedBox();
-        },
-      ),
+          if (widget.embedded) {
+            // Lay out inline inside the parent scroll view.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...sortedUploads.map(_buildItem),
+                if (state.hasMore)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.primary),
+                      ),
+                      onPressed:
+                          () => context.read<MyUploadsBloc>().add(
+                            FetchMoreUploads(state.lastDoc!),
+                          ),
+                      child: const Text('Load more'),
+                    ),
+                  ),
+              ],
+            );
+          }
+
+          return ReorderableListView.builder(
+            scrollController: _scrollController,
+            // Only the handle starts a drag; a long-press anywhere would
+            // collide with playing/expanding a card.
+            buildDefaultDragHandles: false,
+            footer:
+                state.hasMore
+                    ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                    : null,
+            onReorder:
+                (oldIndex, newIndex) =>
+                    _onReorder(sortedUploads, oldIndex, newIndex),
+            itemCount: sortedUploads.length,
+            itemBuilder: (context, index) {
+              final fart = sortedUploads[index];
+              return _reorderable(fart, index);
+            },
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  /// A library row plus its drag handle. Keyed by fart id so Flutter tracks the
+  /// right widget as rows move.
+  Widget _reorderable(FartModel fart, int index) {
+    return Row(
+      key: ValueKey(fart.id),
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ReorderableDragStartListener(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 6, right: 2),
+            child: Tooltip(
+              message: 'Hold and drag to reorder',
+              child: Icon(
+                Icons.drag_indicator,
+                color: AppColors.primary.withValues(alpha: 0.55),
+                size: 26,
+              ),
+            ),
+          ),
+        ),
+        Expanded(child: _buildItem(fart)),
+      ],
     );
   }
 }

@@ -51,11 +51,16 @@ class NotificationServices {
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('logo');
+        AndroidInitializationSettings('ic_stat_flatch');
+    // Do NOT request notification permission here — init() runs at startup for
+    // everyone (incl. guests). The prompt is deferred to registerForUser(),
+    // which only fires once a user signs in (notifications are for comments on
+    // your own posts, so they're only relevant with an account).
     const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
-          requestSoundPermission: true,
-          requestAlertPermission: true,
+          requestSoundPermission: false,
+          requestAlertPermission: false,
+          requestBadgePermission: false,
         );
     const LinuxInitializationSettings initializationSettingsLinux =
         LinuxInitializationSettings(defaultActionName: 'Open notification');

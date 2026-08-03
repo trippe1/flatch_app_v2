@@ -59,7 +59,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     await user.sendEmailVerification();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Verification email sent again!')),
+      const SnackBar(content: Text('Verification email re-sent.')),
     );
     setState(() => _resendIn = 30);
     _cooldownTimer?.cancel();

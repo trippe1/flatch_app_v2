@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
+import 'package:flatch/common/services/age_gate_service.dart';
 import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:just_audio/just_audio.dart';
@@ -18,6 +19,21 @@ class AudioService {
   Stream<bool> get playingStream => _player.playingStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
+  /// Live microphone level (0.0–1.0) emitted while recording, derived from the
+  /// recorder's real decibel readings (flutter_sound `onProgress`). Returns an
+  /// empty stream if the recorder hasn't started yet. `onProgress` is a
+  /// broadcast stream, so it's safe to listen more than once.
+  Stream<double> get recordingLevelStream {
+    final progress = _recorder.onProgress;
+    if (progress == null) return const Stream<double>.empty();
+    return progress.map((e) {
+      final db = e.decibels ?? 0.0;
+      // flutter_sound reports dB where louder = higher; ~60 dB ≈ full scale
+      // for close-mic speech, so normalize against that for a lively meter.
+      return (db / 60.0).clamp(0.0, 1.0).toDouble();
+    });
+  }
+
   Duration? get duration => _player.duration;
   Duration? get position => _player.position;
   bool get isPlaying => _player.playing;
@@ -30,6 +46,8 @@ class AudioService {
   }
 
   Future<bool> checkMicrophonePermission(BuildContext context) async {
+    // COPPA: an age-blocked device must never see a microphone prompt.
+    if (await AgeGateService.instance.isBlocked()) return false;
     final status = await Permission.microphone.status;
     if (status.isGranted) return true;
     if (status.isDenied) {
@@ -74,6 +92,8 @@ class AudioService {
 
   Future<bool> startRecording(BuildContext context) async {
     try {
+      // COPPA: age-blocked devices can never record.
+      if (await AgeGateService.instance.isBlocked()) return false;
       final status = await Permission.microphone.request();
       if (!status.isGranted) return false;
 
@@ -92,6 +112,8 @@ class AudioService {
         sampleRate: 44100,
         bitRate: 128000,
       );
+      // Emit progress (incl. decibels) ~10x/sec so the level meter is live.
+      await _recorder.setSubscriptionDuration(const Duration(milliseconds: 100));
       if (Platform.isIOS) {
         await Future.delayed(const Duration(milliseconds: 50));
       }

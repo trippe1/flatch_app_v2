@@ -18,6 +18,7 @@ import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/styles/app_styles.dart';
 import 'package:flatch/cubits/Individual_signup/individual_signup_cubit.dart';
 import 'package:flatch/cubits/audio_trim/audio_trim_cubit.dart';
+import 'package:flatch/cubits/upload_draft/upload_draft_cubit.dart';
 import 'package:flatch/cubits/delete_user_account/delete_user_account_cubit.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flatch/cubits/flatch_ble/flatch_ble_cubit.dart';
@@ -86,6 +87,7 @@ class MyApp extends StatelessWidget {
           create: (context) => AppCheckVersionCubit(),
         ),
         BlocProvider<AudioTrimCubit>(create: (context) => AudioTrimCubit()),
+        BlocProvider<UploadDraftCubit>(create: (context) => UploadDraftCubit()),
         BlocProvider<UserDetailsBloc>(create: (context) => UserDetailsBloc()),
         BlocProvider<AdminFartsBloc>(create: (context) => AdminFartsBloc()),
         BlocProvider<AdminUsersBloc>(create: (context) => AdminUsersBloc()),
@@ -105,9 +107,10 @@ class MyApp extends StatelessWidget {
                 // Respect the OS font-size setting but clamp it so the layout
                 // stays intact (was fully disabled via TextScaler.noScaling,
                 // an accessibility regression + App Store review risk).
-                final scale = MediaQuery.textScalerOf(
-                  context,
-                ).scale(1.0).clamp(0.9, 1.2).toDouble();
+                final scale =
+                    MediaQuery.textScalerOf(
+                      context,
+                    ).scale(1.0).clamp(0.9, 1.2).toDouble();
                 return MediaQuery(
                   data: MediaQuery.of(
                     context,

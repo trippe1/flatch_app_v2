@@ -5,10 +5,12 @@ import 'package:flatch/common/custom_shapes/custom_ticker.dart';
 import 'package:flatch/common/custom_shapes/thumb_shape.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppStyles {
   static ThemeData light = ThemeData.light().copyWith(
     splashFactory: InkRipple.splashFactory,
+    textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
     scaffoldBackgroundColor: AppColors.background,
     bottomAppBarTheme: const BottomAppBarThemeData(
       color: Colors.white,
@@ -221,6 +223,7 @@ class AppStyles {
     ),
   );
   static ThemeData dark = ThemeData.dark().copyWith(
+    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
     bottomAppBarTheme: const BottomAppBarThemeData(
       color: Colors.black,
       elevation: 8,

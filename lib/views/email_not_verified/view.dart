@@ -52,7 +52,7 @@ class EmailNotVerifiedView extends StatelessWidget {
         Center(child: Image.asset("assets/images/check_mark.png", height: 200)),
         const Gap(30),
         const TextWidget(
-          text: "Verification Email Sent!",
+          text: "Verification email sent.",
           color: AppColors.secondary,
           size: 28,
           weight: FontWeight.w800,

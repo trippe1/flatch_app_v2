@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flatch/blocs/app_check_version/app_check_version_cubit.dart';
+import 'package:flatch/common/color/app_colors.dart';
 import 'package:flatch/cubits/user_app_dashboard/user_app_dashboard_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,10 +15,10 @@ class KBottomAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<String> allSvgs = [
-      "assets/svgs/home1.svg",
-      "assets/svgs/add.svg",
-      "assets/svgs/usb.svg",
-      "assets/svgs/settings.svg",
+      "assets/svgs/flatch_mark.svg", // far-left: community (the Flatch app mark)
+      "assets/svgs/add.svg", // upload
+      "assets/svgs/device_signal.svg", // device connection (generic wireless glyph)
+      "assets/svgs/settings.svg", // settings / profile
     ];
 
     double width = MediaQuery.of(context).size.width;
@@ -55,12 +56,14 @@ class KBottomAppBar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
+                        iconSize: 34,
+                        padding: const EdgeInsets.all(12),
                         style: ButtonStyle().copyWith(
                           backgroundColor: WidgetStatePropertyAll(
                             isSelected
                                 ? Theme.of(
                                   context,
-                                ).colorScheme.secondary.withOpacity(0.15)
+                                ).colorScheme.secondary.withOpacity(0.18)
                                 : Colors.transparent,
                           ),
                           side: const WidgetStatePropertyAll(
@@ -68,7 +71,7 @@ class KBottomAppBar extends StatelessWidget {
                           ),
                           shape: WidgetStatePropertyAll(
                             RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
@@ -86,17 +89,22 @@ class KBottomAppBar extends StatelessWidget {
                         },
                         icon: SvgPicture.asset(
                           allSvgs[index],
-                          width: 25,
-                          height: 25,
+                          width: 34,
+                          height: 34,
                           color:
                               isSelected
-                                  ? Theme.of(context).colorScheme.primary
+                                  // The device tab lights up blue so
+                                  // "hardware" reads apart from the green
+                                  // community/app actions.
+                                  ? (index == 2
+                                      ? AppColors.signalBlue
+                                      : Theme.of(context).colorScheme.primary)
                                   : Theme.of(
                                     context,
-                                  ).iconTheme.color?.withOpacity(.6),
+                                  ).iconTheme.color?.withOpacity(.85),
                         ),
                       ),
-                      const Gap(10),
+                      const Gap(6),
                     ],
                   );
                 }),

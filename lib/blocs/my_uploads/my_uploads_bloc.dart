@@ -31,7 +31,7 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
       emit(currentState.copyWith(uploads: updated));
     });
 
-  on<FetcnInitialUploads>((event, emit) async {
+    on<FetcnInitialUploads>((event, emit) async {
       emit(MyUploadsLoading());
 
       try {
@@ -110,7 +110,7 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
             userName: userName,
             upvotes: data['upvotes'] ?? 0,
             downvotes: data['downvotes'] ?? 0,
-             source: source,
+            source: source,
           );
         });
 
@@ -128,11 +128,9 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
           ),
         );
       } catch (e) {
-        
         emit(MyUploadsError(message: e.toString()));
       }
     });
-
 
     on<FetchMoreUploads>((event, emit) async {
       if (state is! MyUploadsLoaded) return;
@@ -171,7 +169,7 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
         emit(MyUploadsError(message: e.toString()));
       }
     });
-  on<DeleteUpload>((event, emit) async {
+    on<DeleteUpload>((event, emit) async {
       if (state is! MyUploadsLoaded) return;
       final currentState = state as MyUploadsLoaded;
 
@@ -181,7 +179,9 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
 
         final fart = currentState.uploads.firstWhere((f) => f.id == event.id);
 
-        if (fart.uid != currentUid) {
+        // Library-only: remove just this user's saved copy; leave the public
+        // community fart untouched. (Also the path for farts you don't own.)
+        if (event.libraryOnly || fart.uid != currentUid) {
           final librarySnap =
               await FirebaseFirestore.instance
                   .collection('user_fart_library')
@@ -217,10 +217,15 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
 
         await fartDocRef.delete();
 
+        // Only remove OUR OWN library entries for this fart. Other users' saved
+        // copies are theirs to delete — trying to delete them fails the security
+        // rules (owner-only) and surfaced a false "permission denied" error even
+        // though the fart itself was already deleted.
         final librarySnap =
             await FirebaseFirestore.instance
                 .collection('user_fart_library')
                 .where('fartId', isEqualTo: event.id)
+                .where('uid', isEqualTo: currentUid)
                 .get();
 
         for (final doc in librarySnap.docs) {
@@ -235,8 +240,6 @@ class MyUploadsBloc extends Bloc<MyUploadsEvent, MyUploadsState> {
         emit(MyUploadsError(message: 'Failed to delete: ${e.toString()}'));
       }
     });
-
-
   }
 
   static const int _limit = 20;

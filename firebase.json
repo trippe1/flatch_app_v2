@@ -1,1 +1,46 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"flatch-e772e","appId":"1:373407548044:android:06d243374482eeb65df1a9","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"flatch-e772e","appId":"1:373407548044:ios:df9896cf7aabf5ae5df1a9","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"flatch-e772e","configurations":{"android":"1:373407548044:android:06d243374482eeb65df1a9","ios":"1:373407548044:ios:df9896cf7aabf5ae5df1a9"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "flatch-e772e",
+          "appId": "1:373407548044:android:06d243374482eeb65df1a9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "flatch-e772e",
+          "appId": "1:373407548044:ios:df9896cf7aabf5ae5df1a9",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "flatch-e772e",
+          "configurations": {
+            "android": "1:373407548044:android:06d243374482eeb65df1a9",
+            "ios": "1:373407548044:ios:df9896cf7aabf5ae5df1a9"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "moderation",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
+    }
+  ]
+}

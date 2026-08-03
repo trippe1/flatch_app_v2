@@ -72,8 +72,9 @@ class UploadFartBloc extends Bloc<UploadFartEvent, UploadFartState> {
         duration: event.duration,
         createdAt: now,
         updatedAt: now,
-        title: event.isPublic ? event.title : 'Private Fart',
-        category: event.isPublic ? event.category : 'private',
+        // Always keep the user's real title (even for private sounds).
+        title: event.title,
+        category: '', // categories were removed from the upload flow
         isPublic: event.isPublic,
         upvotes: 0,
         downvotes: 0,
@@ -88,10 +89,8 @@ class UploadFartBloc extends Bloc<UploadFartEvent, UploadFartState> {
           .add(fart.toMap());
 
       await docRef.update({'id': docRef.id});
-     final libraryDocRef =
-          FirebaseFirestore.instance
-              .collection('user_fart_library')
-              .doc();
+      final libraryDocRef =
+          FirebaseFirestore.instance.collection('user_fart_library').doc();
 
       final libraryEntry = UserFartLibraryModel(
         id: libraryDocRef.id,
@@ -106,7 +105,6 @@ class UploadFartBloc extends Bloc<UploadFartEvent, UploadFartState> {
       );
 
       await libraryDocRef.set(libraryEntry.toMap());
-
 
       emit(UploadFartSuccess());
     } catch (e) {

@@ -51,7 +51,7 @@ class DashboardView extends StatelessWidget {
         ),
         const Gap(20),
         const TextWidget(
-          text: "Oops! Something went wrong.",
+          text: "Something went wrong.",
           size: 22,
           weight: FontWeight.bold,
         ),
@@ -77,10 +77,7 @@ class DashboardView extends StatelessWidget {
       while (GoRouter.of(context).canPop()) {
         GoRouter.of(context).pop();
       }
-      if (!user.emailVerified) {
-        context.read<DashboardBloc>().add(EmitInitialState());
-        context.goNamed(AppRoute.emailVerificationScreen.name);
-      } else {
+      {
         context.read<DashboardBloc>().add(EmitInitialState());
         context.goNamed(AppRoute.home.name);
       }
@@ -98,9 +95,9 @@ class DashboardView extends StatelessWidget {
           ),
         ),
         const Gap(20),
-        const TextWidget(text: "Success!", size: 22, weight: FontWeight.bold),
+        const TextWidget(text: "Registered.", size: 22, weight: FontWeight.bold),
         TextWidget(
-          text: "Your Flatch account is ready! Redirecting shortly...",
+          text: "Your Flatch account is on file. Proceeding.",
           color: Colors.black.withOpacity(.6),
           padding: 60,
           textAlign: TextAlign.center,
@@ -123,7 +120,7 @@ class DashboardView extends StatelessWidget {
         Gap(height < 813 ? 60 : 80),
         const Center(
           child: TextWidget(
-            text: "Welcome to Flatch!",
+            text: "Flatulations are NOT funny.",
             textAlign: TextAlign.center,
             size: 24,
             weight: FontWeight.w800,
@@ -134,7 +131,7 @@ class DashboardView extends StatelessWidget {
         const Center(
           child: TextWidget(
             text:
-                "Record, share, and rate the funniest farts on the planet.\nLet the games begin!",
+                "Record sounds. Deploy them to the device. Maintain the archive.",
             textAlign: TextAlign.center,
             color: Colors.grey,
             size: 16,

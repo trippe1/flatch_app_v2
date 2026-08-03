@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    // An admin is a signed-in user whose OWN app_users doc has role == 'Admin'.
+    // Because normal users can no longer edit their own `role` (see below),
+    // this can only be granted server-side / by an existing admin.
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/app_users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/app_users/$(request.auth.uid)).data.role == 'Admin';
+    }
+    // Fields a normal user must NOT be able to change on their own profile.
+    function privilegedUnchanged() {
+      return request.resource.data.get('role', '')      == resource.data.get('role', '')
+        &&   request.resource.data.get('isBan', false)  == resource.data.get('isBan', false)
+        &&   request.resource.data.get('banReason', '') == resource.data.get('banReason', '')
+        &&   request.resource.data.get('bannedAt', 0)   == resource.data.get('bannedAt', 0);
+    }
+
+    // ---------- user profiles ----------
+    match /app_users/{userId} {
+      allow read: if isSignedIn();
+      // At signup a user creates their own doc, but cannot self-assign Admin.
+      allow create: if isOwner(userId)
+        && request.resource.data.role != 'Admin'
+        && request.resource.data.get('isBan', false) != true;
+      // Owners may edit their profile but NOT role/ban fields; admins may edit anything.
+      allow update: if isAdmin()
+        || (isOwner(userId) && privilegedUnchanged());
+      allow delete: if isAdmin() || isOwner(userId);
+    }
+
+    // ---------- presence ----------
+    match /app_active_users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    // ---------- farts ----------
+    match /user_farts/{fartId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // Owner/admin: full edit. Anyone signed-in: ONLY the aggregate counters
+      // (this is what voting / reporting / commenting bump on someone else's fart).
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.uid == request.auth.uid)
+        || (isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['upvotes', 'downvotes', 'reportCount', 'commentCount']));
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+
+      // one vote doc per user, doc id == voter uid
+      match /votes/{voterId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(voterId);
+      }
+
+      // one report doc per user, doc id == reporter uid
+      match /reports/{reporterId} {
+        allow read: if isAdmin() || isOwner(reporterId);
+        allow write: if isOwner(reporterId);
+      }
+
+      // comments
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+        allow update: if isAdmin()
+          || (isSignedIn() && resource.data.uid == request.auth.uid)
+          || (isSignedIn()
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['upvotes', 'upvotedUserIds', 'reportCount', 'reportedUserIds']));
+        allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+
+        match /reports/{reporterId} {
+          allow read: if isAdmin() || isOwner(reporterId);
+          allow write: if isOwner(reporterId);
+        }
+      }
+    }
+
+    // ---------- personal sound library ----------
+    match /user_fart_library/{docId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------- support inbox ----------
+    match /contact_support/{docId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- legacy company accounts (retain authed behavior) ----------
+    match /company_users/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ---------- push notification tokens ----------
+    // Owner-only; kept out of the world-readable app_users doc. The notify
+    // Cloud Function reads these via the Admin SDK (bypasses rules).
+    match /user_push_tokens/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ---------- Farts with Buddies ----------
+    // A signed-in user is a member of a group iff their uid is in members[].
+    function isFwbMember(groupId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/fwb_groups/$(groupId))
+        && request.auth.uid in
+             get(/databases/$(database)/documents/fwb_groups/$(groupId)).data.members;
+    }
+
+    match /fwb_groups/{groupId} {
+      // Readable by any signed-in user so invite links can load the group
+      // before joining.
+      allow read: if isSignedIn();
+      // Creator makes the group with only themselves as the first member.
+      allow create: if isSignedIn()
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.members == [request.auth.uid];
+      // Creator may edit the group; anyone signed-in may join/leave, but a
+      // non-creator edit can ONLY touch the members list (arrayUnion/Remove).
+      allow update: if isSignedIn()
+        && (resource.data.creatorUid == request.auth.uid
+            || request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly(['members']));
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.creatorUid == request.auth.uid);
+
+      // Chat messages — members only. Immutable once written (the notify
+      // Cloud Function reads them via the Admin SDK, bypassing rules).
+      match /messages/{messageId} {
+        allow read: if isFwbMember(groupId);
+        allow create: if isFwbMember(groupId)
+          && request.resource.data.senderUid == request.auth.uid;
+      }
+    }
+
+    // ---------- per-user settings (FWB notification preference, etc.) --------
+    match /user_settings/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ---------- content-moderation queue ----------
+    // Written by the moderation Cloud Function (Admin SDK, bypasses rules);
+    // only admins may read it or act on it from the app.
+    match /moderation_queue/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Everything else: denied by default (no catch-all).
+  }
+}

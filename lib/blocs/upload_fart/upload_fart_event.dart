@@ -9,7 +9,6 @@ final class UploadFartEvent extends Equatable {
 
 final class UploadUserFart extends UploadFartEvent {
   final String title;
-  final String category;
   final String fileType;
   final int duration;
   final String filePath;
@@ -17,7 +16,6 @@ final class UploadUserFart extends UploadFartEvent {
 
   const UploadUserFart({
     required this.title,
-    required this.category,
     required this.fileType,
     required this.duration,
     required this.filePath,

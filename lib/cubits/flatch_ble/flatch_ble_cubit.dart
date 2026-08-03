@@ -5,7 +5,10 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:bloc/bloc.dart';
-import 'package:crypto/crypto.dart';
+import 'package:flatch/common/constants/flatch_ble_constants.dart';
+import 'package:flatch/common/services/device_key_service.dart';
+import 'package:flatch/common/services/telemetry_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:equatable/equatable.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flatch/common/services/app_logger.dart';
@@ -16,18 +19,23 @@ part 'flatch_ble_state.dart';
 
 class FlatchBleCubit extends Cubit<FlatchBleState> {
   FlatchBleCubit() : super(const FlatchBleState()) {
-    _init();
+    // Only local file setup here. Touching FlutterBluePlus instantiates the
+    // platform BLE stack, which makes iOS show the "wants to use Bluetooth"
+    // prompt — that must not happen at app launch, only when the user opens
+    // the device page (see startBle()).
+    _initLocal();
   }
+
+  bool _bleStarted = false;
 
   // ===================== CONFIG =====================
 
-  static const String serviceUuid = "0000abcd-0000-1000-8000-00805f9b34fb";
-  static const String cmdUuid = "0000abce-0000-1000-8000-00805f9b34fb";
-  static const String dataUuid = "0000abcf-0000-1000-8000-00805f9b34fb";
-  static const String statusUuid = "0000abd0-0000-1000-8000-00805f9b34fb";
-  static const String flowControlUuid = "0000abd1-0000-1000-8000-00805f9b34fb";
-
-  static const String _authSecret = "CHANGE_ME_TO_STRONG_SECRET_123";
+  // Single source of truth lives in FlatchBle (shared with firmware + native).
+  static const String serviceUuid = FlatchBle.serviceUuid;
+  static const String cmdUuid = FlatchBle.cmdUuid;
+  static const String dataUuid = FlatchBle.dataUuid;
+  static const String statusUuid = FlatchBle.statusUuid;
+  static const String flowControlUuid = FlatchBle.flowControlUuid;
 
   // ===================== BLE =====================
 
@@ -68,7 +76,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
   // ===================== INIT =====================
 
-  Future<void> _init() async {
+  Future<void> _initLocal() async {
     _soundDir = Directory(
       '${(await getApplicationDocumentsDirectory()).path}/flatch',
     );
@@ -77,21 +85,64 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     }
 
     _loadLocalFiles();
+  }
+
+  /// Bring up the BLE stack. Call this ONLY from the device-connection page —
+  /// the first touch of FlutterBluePlus is what triggers the OS Bluetooth
+  /// permission prompt, so it must be tied to the user opening that page.
+  /// Idempotent.
+  Future<void> startBle() async {
+    if (_bleStarted) return;
+    _bleStarted = true;
+
+    // Reflect the current adapter state immediately. On iOS this can be
+    // 'unknown' until BLE is first used — that is NOT "off", so we only flag
+    // isBluetoothOff on an explicit off report.
+    final now0 = FlutterBluePlus.adapterStateNow;
+    emit(
+      state.copyWith(
+        isBluetoothOn: now0 == BluetoothAdapterState.on,
+        isBluetoothOff: now0 == BluetoothAdapterState.off,
+      ),
+    );
 
     FlutterBluePlus.adapterState.listen((s) async {
       final isOn = s == BluetoothAdapterState.on;
+      final isOff = s == BluetoothAdapterState.off;
 
-      emit(state.copyWith(isBluetoothOn: isOn));
+      emit(state.copyWith(isBluetoothOn: isOn, isBluetoothOff: isOff));
 
       if (isOn) {
         await scanDevices();
-      } else {
+      } else if (isOff) {
         emit(state.copyWith(devices: []));
       }
     });
 
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      emit(state.copyWith(devices: results.map((e) => e.device).toList()));
+      // startScan is already filtered by the Flatch service UUID; this is a
+      // belt-and-suspenders filter (some platforms omit service data in the
+      // result) plus a sort so the CLOSEST Flatch is listed first.
+      final flatch =
+          results.where((r) {
+              final advertisesService = r.advertisementData.serviceUuids
+                  .contains(Guid(FlatchBle.serviceUuid));
+              final name =
+                  r.device.platformName.isNotEmpty
+                      ? r.device.platformName
+                      : r.advertisementData.advName;
+              return advertisesService ||
+                  FlatchBle.nameLooksLikeFlatch(name);
+            }).toList()
+            ..sort((a, b) => b.rssi.compareTo(a.rssi));
+      emit(
+        state.copyWith(
+          devices: flatch.map((r) => r.device).toList(),
+          deviceRssi: {
+            for (final r in flatch) r.device.remoteId.str: r.rssi,
+          },
+        ),
+      );
     });
   }
 
@@ -153,7 +204,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
         if (!await file.exists()) {
           appLogger.e('❌ [SYNC] File does not exist: ${file.path}');
-          emit(state.copyWith(statusMessage: "A queued file is missing"));
+          emit(state.copyWith(statusMessage: "A queued file is missing from the record."));
           await requestSlotList();
           return false;
         }
@@ -166,7 +217,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         // lands and BLE appears to freeze.
         if (!await _sendCmdAwaitAck("UPLOAD_BEGIN:$slot,${bytes.length}")) {
           appLogger.e('❌ [SYNC] No ack for UPLOAD_BEGIN (slot $slot)');
-          emit(state.copyWith(statusMessage: "Upload stalled — please retry"));
+          emit(state.copyWith(statusMessage: "Transfer stalled. Retry."));
           await requestSlotList();
           emit(state.copyWith(queuedLibrarySounds: queued.sublist(uploaded)));
           return false;
@@ -195,7 +246,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         // rename) before starting the next file.
         if (!await _sendCmdAwaitAck("UPLOAD_END")) {
           appLogger.e('❌ [SYNC] No ack for UPLOAD_END (slot $slot)');
-          emit(state.copyWith(statusMessage: "Upload stalled — please retry"));
+          emit(state.copyWith(statusMessage: "Transfer stalled. Retry."));
           await requestSlotList();
           emit(state.copyWith(queuedLibrarySounds: queued.sublist(uploaded)));
           return false;
@@ -215,7 +266,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         emit(
           state.copyWith(
             queuedLibrarySounds: queued.sublist(uploaded),
-            statusMessage: "Sync cancelled",
+            statusMessage: "Deployment cancelled.",
           ),
         );
         return false;
@@ -224,7 +275,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       emit(
         state.copyWith(
           queuedLibrarySounds: [],
-          statusMessage: "Flatch Updated!",
+          statusMessage: "Flatch updated.",
         ),
       );
 
@@ -235,30 +286,123 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       appLogger.e('Error: $e');
       appLogger.e('Stack: $s');
 
-      emit(state.copyWith(statusMessage: "Error with Update"));
+      emit(state.copyWith(statusMessage: "Update failed."));
       return false;
     }
   }
 
   Future<void> playNextSound() async {
     if (!_authed || _cmd == null) {
-      emit(state.copyWith(statusMessage: "Not connected"));
+      emit(state.copyWith(statusMessage: "No device connected."));
       return;
     }
 
     try {
       await _sendCmd("PLAY_STEP");
-      emit(state.copyWith(statusMessage: "Playing next sound"));
+      emit(state.copyWith(statusMessage: "Advancing to the next sound."));
     } catch (e) {
       emit(state.copyWith(statusMessage: "Play failed: $e"));
     }
   }
 
+  /// User-driven "Allow Bluetooth" action from the device page: asks for the
+  /// permission and, on Android, offers to switch the radio on — so the user
+  /// never has to leave for system Settings unless they permanently denied it.
+  /// Returns true when we're clear to scan.
+  Future<bool> requestBleAccess() async {
+    final granted = await _ensureBlePermissions();
+
+    if (!granted) {
+      final permanently =
+          Platform.isAndroid
+              ? await Permission.bluetoothScan.isPermanentlyDenied
+              : await Permission.bluetooth.isPermanentlyDenied;
+      emit(
+        state.copyWith(
+          blePermissionDenied: true,
+          blePermissionPermanentlyDenied: permanently,
+          statusMessage:
+              permanently
+                  ? 'Bluetooth access is off for Flatch. Turn it on in Settings '
+                      'to connect your device.'
+                  : 'Bluetooth access is needed to find your Flatch.',
+        ),
+      );
+      return false;
+    }
+
+    emit(
+      state.copyWith(
+        blePermissionDenied: false,
+        blePermissionPermanentlyDenied: false,
+      ),
+    );
+
+    // Android can prompt to enable the radio in place; iOS cannot — there the
+    // user has to flip it in Control Centre/Settings, so we just say so.
+    if (Platform.isAndroid &&
+        FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+      try {
+        await FlutterBluePlus.turnOn();
+      } catch (_) {
+        emit(
+          state.copyWith(statusMessage: 'Please switch Bluetooth on to continue.'),
+        );
+        return false;
+      }
+    }
+
+    await startBle();
+    await scanDevices();
+    return true;
+  }
+
+  /// Opens the OS settings page for Flatch — last resort when the permission
+  /// was permanently denied and the system will no longer prompt.
+  Future<void> openBleSettings() => openAppSettings();
+
+  /// Request Bluetooth permissions in-context — only when the user is actually
+  /// trying to connect to their Flatch device, never at app startup.
+  Future<bool> _ensureBlePermissions() async {
+    try {
+      if (Platform.isAndroid) {
+        // API 31+ : BLUETOOTH_SCAN (neverForLocation) + BLUETOOTH_CONNECT, no
+        // location. API <=30 : location is requested too (best effort) because
+        // legacy BLE scanning requires it there; only scan+connect are gating.
+        await [
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.locationWhenInUse,
+        ].request();
+        final scan = await Permission.bluetoothScan.status;
+        final connect = await Permission.bluetoothConnect.status;
+        return scan.isGranted && connect.isGranted;
+      }
+      return (await Permission.bluetooth.request()).isGranted;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> scanDevices() async {
+    if (!await _ensureBlePermissions()) {
+      emit(
+        state.copyWith(
+          isLoading: false,
+          statusMessage: 'Bluetooth access is required to locate the device.',
+        ),
+      );
+      return;
+    }
     emit(state.copyWith(isLoading: true, devices: []));
 
     await FlutterBluePlus.stopScan();
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+    // Only surface Flatch devices — filter the scan by the product-family
+    // service UUID so no unrelated Bluetooth devices ever appear.
+    await FlutterBluePlus.startScan(
+      withServices: [Guid(FlatchBle.serviceUuid)],
+      timeout: const Duration(seconds: 5),
+    );
 
     await Future.delayed(const Duration(seconds: 10));
     await FlutterBluePlus.stopScan();
@@ -272,28 +416,62 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     emit(
       state.copyWith(
         isConnecting: true,
-        statusMessage: "Connecting to device...",
+        error: null,
+        statusMessage: "Connecting to your Flatch…",
       ),
     );
 
-    try {
-      // Stop scanning before connecting
-      await FlutterBluePlus.stopScan();
+    // Up to 3 attempts, 10s each, with a short backoff (Brief §5.3).
+    Object? lastError;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) {
+          emit(
+            state.copyWith(
+              statusMessage:
+                  "Connecting to your Flatch… (attempt $attempt of 3)",
+            ),
+          );
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+        }
+        await _attemptConnect(device);
+        return; // success
+      } catch (e) {
+        lastError = e;
+        try {
+          await device.disconnect();
+        } catch (_) {}
+      }
+    }
+    _connected = false;
+    emit(
+      state.copyWith(
+        isConnecting: false,
+        isLoading: false,
+        statusMessage: "The connection could not be established.",
+        error: lastError.toString(),
+      ),
+    );
+  }
 
-      // Connect to the device
-      await device.connect(
-        autoConnect: false,
-        timeout: const Duration(seconds: 8),
-      );
+  Future<void> _attemptConnect(BluetoothDevice device) async {
+    // Stop scanning before connecting
+    await FlutterBluePlus.stopScan();
 
-      _connected = true;
+    // Connect to the device
+    await device.connect(
+      autoConnect: false,
+      timeout: const Duration(seconds: 10),
+    );
+
+    _connected = true;
 
       // Listen for disconnections
       _connSub?.cancel();
       _connSub = device.connectionState.listen((s) {
         if (s == BluetoothConnectionState.disconnected) {
           _connected = false;
-          _resetAll("Device disconnected");
+          _resetAll("The device has gone silent. Investigate.");
         }
       });
 
@@ -339,7 +517,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         state.copyWith(
           connectedDevice: device,
           isLoading: false,
-          statusMessage: "Connected — Authenticating...",
+          statusMessage: "Link established. Verifying credentials…",
         ),
       );
 
@@ -347,18 +525,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       await requestSlotList();
 
-      emit(state.copyWith(statusMessage: "Device ready", isConnecting: false));
-    } catch (e) {
-      _connected = false;
-      emit(
-        state.copyWith(
-          isConnecting: false,
-          isLoading: false,
-          statusMessage: "Connection failed",
-          error: e.toString(),
-        ),
-      );
-    }
+      emit(state.copyWith(statusMessage: "Device ready. Standing by.", isConnecting: false));
   }
 
 
@@ -370,24 +537,38 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     await _sendCmdRaw("AUTH_HELLO");
     await _authCompleter!.future.timeout(const Duration(seconds: 4));
     emit(state.copyWith(isCodeVerified: true, statusMessage: "AUTH OK"));
+    Telemetry.instance.deviceConnected();
   }
 
-  void _handleAuthChallenge(String hex) async {
-    final bytes = _hexToBytes(hex);
-    final hmac = Hmac(sha256, utf8.encode(_authSecret));
-    final digest = hmac.convert(bytes);
-    final resp =
-        digest.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    await _sendCmdRaw("AUTH_RESP:$resp");
-  }
-
-  static Uint8List _hexToBytes(String hex) {
-    final clean = hex.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
-    final out = Uint8List(clean.length ~/ 2);
-    for (int i = 0; i < out.length; i++) {
-      out[i] = int.parse(clean.substring(i * 2, i * 2 + 2), radix: 16);
+  /// Handle `AUTH_CHAL:<challengeHex>,<MAC>`. The device authenticates with a
+  /// PER-DEVICE key (not the old shared secret): we look up the key for the MAC
+  /// it reported, then reply HMAC-SHA256(key, challenge) over the raw bytes of
+  /// each. The MAC comes from the message, not from BLE, because iOS hides the
+  /// hardware MAC behind a random peripheral UUID.
+  void _handleAuthChallenge(String payload) async {
+    final parsed = DeviceKeyService.parseChallenge(payload);
+    if (parsed == null || parsed.challengeHex.isEmpty) {
+      emit(state.copyWith(statusMessage: "Auth error: bad challenge."));
+      return;
     }
-    return out;
+
+    final resp = await DeviceKeyService.computeResponse(
+      challengeHex: parsed.challengeHex,
+      mac: parsed.mac,
+    );
+
+    if (resp == null) {
+      // No key on file for this device.
+      emit(
+        state.copyWith(
+          statusMessage:
+              "This Flatch isn't recognized (${parsed.mac}). It may need to be "
+              "registered.",
+        ),
+      );
+      return;
+    }
+    await _sendCmdRaw("AUTH_RESP:$resp");
   }
 
   Future<void> _handleStatus(List<int> raw) async {
@@ -457,7 +638,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
           isDownloading: true,
           downloadingSlot: _dlSlot,
           downloadProgress: 0.0,
-          statusMessage: "Downloading slot $_dlSlot...",
+          statusMessage: "Retrieving slot $_dlSlot…",
         ),
       );
       return;
@@ -566,7 +747,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         state.copyWith(
           isDownloading: false,
           downloadingSlot: null,
-          statusMessage: "Download failed: no DL_BEGIN",
+          statusMessage: "Retrieval failed. No response from the device.",
         ),
       );
       return;
@@ -628,7 +809,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         downloadProgress: 0,
         soundFiles: _soundDir.listSync().whereType<File>().toList(),
         downloadedFilePaths: updatedPaths,
-        statusMessage: "Slot $_dlSlot downloaded as '$fileName'",
+        statusMessage: "Slot $_dlSlot retrieved as '$fileName'.",
       ),
     );
   }
@@ -645,8 +826,8 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     final bytes = res.files.first.bytes!;
     final slot = _firstEmptySlot();
 
-    appLogger.d("Uploading to slot $slot");
-    emit(state.copyWith(statusMessage: "Uploading to slot $slot"));
+    appLogger.d("Deploying to slot $slot.");
+    emit(state.copyWith(statusMessage: "Deploying to slot $slot."));
 
     // Same handshake as the multi-file sync: wait for the device to ack each
     // command so we don't race its flash work.
@@ -654,7 +835,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       emit(
         state.copyWith(
           uploadProgress: 0,
-          statusMessage: "Upload stalled — please retry",
+          statusMessage: "Transfer stalled. Retry.",
         ),
       );
       await requestSlotList();
@@ -680,7 +861,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       emit(
         state.copyWith(
           uploadProgress: 0,
-          statusMessage: "Upload stalled — please retry",
+          statusMessage: "Transfer stalled. Retry.",
         ),
       );
       await requestSlotList();
@@ -688,7 +869,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     }
     await requestSlotList();
 
-    emit(state.copyWith(uploadProgress: 0, statusMessage: "Upload complete"));
+    emit(state.copyWith(uploadProgress: 0, statusMessage: "Deployment complete."));
   }
   // ===================== PLAY SLOT =====================
 
@@ -696,7 +877,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     if (!_authed || _cmd == null) {
       emit(
         state.copyWith(
-          statusMessage: "Not authenticated or no command characteristic",
+          statusMessage: "Not authorized. Complete the handshake first.",
         ),
       );
       return;
@@ -708,11 +889,11 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       // Send the command to play the slot
       await _sendCmd("PLAY:$slot");
       appLogger.d('Command sent to play slot $slot');
-      emit(state.copyWith(statusMessage: "Playing slot $slot"));
+      emit(state.copyWith(statusMessage: "Deploying slot $slot."));
     } catch (e) {
       // Catch any exceptions that occur during the command send
       appLogger.e('Error occurred while playing slot $slot: $e');
-      emit(state.copyWith(statusMessage: "Error playing slot $slot"));
+      emit(state.copyWith(statusMessage: "Slot $slot failed to deploy."));
     }
   }
 
@@ -720,7 +901,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
     if (!_authed || _cmd == null) {
       emit(
         state.copyWith(
-          statusMessage: "Not authenticated or no command characteristic",
+          statusMessage: "Not authorized. Complete the handshake first.",
         ),
       );
       return;
@@ -739,10 +920,10 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         await requestSlotList();
       }
 
-      emit(state.copyWith(statusMessage: "Slot $slot deleted"));
+      emit(state.copyWith(statusMessage: "Slot $slot cleared."));
     } catch (e) {
       appLogger.e('Error occurred while deleting slot $slot: $e');
-      emit(state.copyWith(statusMessage: "Error deleting slot $slot"));
+      emit(state.copyWith(statusMessage: "Slot $slot could not be cleared."));
     }
   }
 
@@ -795,7 +976,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
   Future<void> downloadSlot(int slot) async {
     if (_downloading) {
-      emit(state.copyWith(statusMessage: "Already downloading"));
+      emit(state.copyWith(statusMessage: "A retrieval is already in progress."));
       return;
     }
 
@@ -811,7 +992,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       state.copyWith(
         isDownloading: true,
         downloadingSlot: slot,
-        statusMessage: "Starting download for slot $slot",
+        statusMessage: "Initiating retrieval of slot $slot…",
         downloadProgress: 0.0,
       ),
     );
@@ -825,7 +1006,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
         state.copyWith(
           isDownloading: false,
           downloadingSlot: null,
-          statusMessage: "Download failed to start",
+          statusMessage: "Retrieval could not be initiated.",
         ),
       );
     }
@@ -854,7 +1035,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
           isDownloading: false,
           downloadingSlot: null,
           downloadProgress: 0,
-          statusMessage: "Transfer cancelled",
+          statusMessage: "Transfer cancelled.",
         ),
       );
     }
@@ -951,7 +1132,7 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
     await requestSlotList();
 
-    emit(state.copyWith(statusMessage: "Slots reordered successfully"));
+    emit(state.copyWith(statusMessage: "Slot order updated."));
   }
 
   @override

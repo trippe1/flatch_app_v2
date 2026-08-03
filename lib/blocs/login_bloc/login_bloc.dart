@@ -133,19 +133,9 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
 
         print("✅ Google account selected: ${account.email}");
 
-        final bool isAlreadyExist = await CloudFunctionsService.instance
-            .checkEmailExists(account.email.trim());
-
-        print("🟡 Checking if email already exists: $isAlreadyExist");
-
-        if (isAlreadyExist) {
-          print("⚠️ Email already exists in system. Aborting sign-in.");
-          emit(const LoginFailureState('User already signed in or exists.'));
-          return;
-        }
-
-        print("🟢 Email does not exist. Continuing authentication...");
-
+        // NOTE: no "email already exists" gate here — Google is sign-in OR
+        // sign-up. Returning users must be allowed through; the Firestore
+        // create-if-absent block below handles first-time vs. existing users.
         final GoogleSignInAuthentication authenticate =
             await account.authentication;
         print("🟢 Retrieved authentication tokens.");

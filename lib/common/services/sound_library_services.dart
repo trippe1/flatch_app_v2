@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flatch/common/constants/upload_messages.dart';
 import 'package:flatch/common/models/fart_model.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,7 +14,7 @@ class SoundLibraryService {
   static final _firestore = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
-static Future<void> saveToLibrary({
+  static Future<void> saveToLibrary({
     required BuildContext context,
     required FartModel fart,
     required String source,
@@ -60,12 +61,11 @@ static Future<void> saveToLibrary({
 
       await libraryDocRef.set(libraryEntry.toMap());
 
-      _showToast(context, 'Saved to Library', ToastificationType.success);
+      _showToast(context, UploadMessages.random(), ToastificationType.success);
     } catch (e) {
       _showToast(context, 'Failed to save sound', ToastificationType.error);
     }
   }
-
 
   static Future<void> shareSoundUrl({
     required String audioUrl,
@@ -81,7 +81,6 @@ static Future<void> saveToLibrary({
 
     await SharePlus.instance.share(params);
   }
-
 
   static void _showToast(
     BuildContext context,

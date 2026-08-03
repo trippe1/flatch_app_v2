@@ -1,0 +1,6 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Generic wireless/broadcast glyph (NOT the Bluetooth figure mark).
+       Center node with symmetric radiating signal arcs. Monochrome; tinted
+       by the bottom nav bar. -->
+  <path fill="#1A1A1A" d="M7.76 16.24l1.42-1.42c-1.56-1.56-1.56-4.09 0-5.66L7.76 7.76c-2.34 2.34-2.34 6.16 0 8.48zM16.24 16.24c2.34-2.34 2.34-6.16 0-8.48l-1.42 1.4c1.56 1.56 1.56 4.09 0 5.66l1.42 1.42zM5.64 18.36l1.41-1.41c-2.73-2.73-2.73-7.16 0-9.9L5.64 5.64c-3.51 3.51-3.51 9.21 0 12.72zM18.36 5.64l-1.41 1.41c2.73 2.73 2.73 7.16 0 9.9l1.41 1.41c3.51-3.51 3.51-9.21 0-12.72zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+</svg>

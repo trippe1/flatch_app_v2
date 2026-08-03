@@ -1,0 +1,34 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- [plate removed]  "My Fart Library" mark: a bubbling cauldron over a fire, as supplied.
+       The artwork group is scaled 1.15x and re-centred inside the plate so it
+       fills the same proportion as the community mark — the two chips sit side
+       by side and must read at the same visual weight. -->
+  <g transform="translate(99.4,105.2) scale(1.15)">
+    <path d="M-34,-30 C-52,-18 -54,10 -44,30 C-38,44 -30,52 -20,55 L20,55 C30,52 38,44 44,30 C54,10 52,-18 34,-30 Z" fill="#26251F" stroke="#F1EDE4" stroke-width="8" stroke-linejoin="round"/>
+    <ellipse cx="0" cy="-34" rx="40" ry="10" fill="#141414" stroke="#F1EDE4" stroke-width="9"/>
+    <circle cx="-28" cy="-36" r="5" fill="#3E8E41"/>
+    <circle cx="-16" cy="-40" r="7" fill="#4CAF50"/>
+    <circle cx="-4" cy="-35" r="4" fill="#2E6B33" opacity="0.85"/>
+    <circle cx="8" cy="-40" r="6" fill="#4CAF50"/>
+    <circle cx="20" cy="-36" r="5" fill="#3E8E41"/>
+    <circle cx="30" cy="-39" r="4" fill="#4CAF50"/>
+    <circle cx="-24" cy="-54" r="4" fill="#3E8E41"/>
+    <circle cx="-8" cy="-64" r="5" fill="#4CAF50"/>
+    <circle cx="6" cy="-56" r="3.5" fill="#2E6B33" opacity="0.85"/>
+    <circle cx="18" cy="-70" r="6" fill="#4CAF50"/>
+    <circle cx="30" cy="-58" r="4" fill="#3E8E41"/>
+    <circle cx="34" cy="-74" r="3" fill="#2E6B33" opacity="0.85"/>
+    <path d="M-62,62 C-65,54 -63,48 -67,41 C-62,45 -61,50 -60,48 C-61,54 -59,58 -58,62 Z" fill="#B85C2B"/>
+    <path d="M-52,64 C-56,52 -52,44 -56,32 C-51,38 -51,45 -48,42 C-50,51 -46,57 -45,64 Z" fill="#E58E3C"/>
+    <path d="M-40,66 C-42,56 -38,50 -41,42 C-37,46 -38,52 -35,50 C-37,56 -34,60 -33,66 Z" fill="#F2B25C"/>
+    <path d="M-27,67 C-29,60 -26,56 -28,49 C-25,53 -25,58 -23,56 C-24,60 -22,63 -21,67 Z" fill="#B85C2B"/>
+    <path d="M-15,68 C-19,54 -14,45 -18,32 C-13,39 -13,48 -10,45 C-12,54 -9,61 -8,68 Z" fill="#E58E3C"/>
+    <path d="M-3,68 C-5,60 -1,54 -3,45 C1,50 0,56 3,54 C1,60 3,64 4,68 Z" fill="#F2B25C"/>
+    <path d="M8,68 C6,62 9,58 7,51 C10,55 10,59 12,57 C11,61 13,64 14,68 Z" fill="#B85C2B"/>
+    <path d="M19,67 C15,54 20,45 16,34 C21,41 21,48 24,45 C22,54 26,61 27,67 Z" fill="#E58E3C"/>
+    <path d="M31,66 C29,60 32,55 30,49 C33,52 33,57 35,55 C34,59 36,62 37,66 Z" fill="#F2B25C"/>
+    <path d="M42,64 C39,54 43,48 40,39 C44,43 44,50 47,48 C45,54 48,59 49,64 Z" fill="#B85C2B"/>
+    <path d="M53,62 C51,55 54,50 52,43 C55,47 55,52 57,50 C56,55 58,58 59,62 Z" fill="#E58E3C"/>
+    <path d="M64,60 C63,55 65,51 63,46 C66,49 65,53 67,52 C66,55 68,57 68,60 Z" fill="#F2B25C"/>
+  </g>
+</svg>

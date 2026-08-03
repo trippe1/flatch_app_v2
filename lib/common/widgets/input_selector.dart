@@ -11,10 +11,19 @@ class InputSelectorWidget extends StatelessWidget {
     required this.onChoiceSelected,
   });
 
+  // Note: 'audio' pulls from the Files app, 'video' from the Photos library —
+  // the ids are unchanged (the pickers key off them); only the labels/icons
+  // present them as "Upload from Files" / "Upload from Photos". Generic
+  // folder/photo glyphs are used rather than Apple's trademarked Files/Photos
+  // app icons.
   static final _choices = [
     {'id': 'record', 'icon': Icons.mic_rounded, 'label': 'Record'},
-    {'id': 'audio', 'icon': Icons.audiotrack_rounded, 'label': 'Audio'},
-    {'id': 'video', 'icon': Icons.videocam_rounded, 'label': 'Video'},
+    {'id': 'audio', 'icon': Icons.folder_rounded, 'label': 'Upload from Files'},
+    {
+      'id': 'video',
+      'icon': Icons.photo_library_rounded,
+      'label': 'Upload from Photos',
+    },
   ];
 
   @override
@@ -39,18 +48,24 @@ class InputSelectorWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: List.generate(_choices.length, (i) {
-              final choice = _choices[i];
-              return Expanded(
-                child: _ChoiceButton(
-                  icon: choice['icon'] as IconData,
-                  label: choice['label'] as String,
-                  isSelected: selectedChoice == choice['id'],
-                  onTap: () => onChoiceSelected(choice['id'] as String),
-                ),
-              );
-            }),
+          // The labels wrap to different line counts ("Record" is one line,
+          // the uploads are two), so each box used to size itself. IntrinsicHeight
+          // + stretch makes them all match the tallest.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: List.generate(_choices.length, (i) {
+                final choice = _choices[i];
+                return Expanded(
+                  child: _ChoiceButton(
+                    icon: choice['icon'] as IconData,
+                    label: choice['label'] as String,
+                    isSelected: selectedChoice == choice['id'],
+                    onTap: () => onChoiceSelected(choice['id'] as String),
+                  ),
+                );
+              }),
+            ),
           ),
         ],
       ),
@@ -87,16 +102,22 @@ class _ChoiceButton extends StatelessWidget {
           border: Border.all(color: color!, width: 2),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 28),
             const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 14,
+            Expanded(
+              child: Center(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: 13,
+                    height: 1.15,
+                  ),
+                ),
               ),
             ),
           ],

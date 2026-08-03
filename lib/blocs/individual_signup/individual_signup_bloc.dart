@@ -108,23 +108,8 @@ class IndividualSignupBloc
 
         print("✅ Google account selected: ${account.email}");
 
-        final bool isAlreadyExist = await CloudFunctionsService.instance
-            .checkEmailExists(account.email.trim());
-
-        print("🟡 Checking if email already exists: $isAlreadyExist");
-
-        if (isAlreadyExist) {
-          print("⚠️ Email already exists in system. Aborting sign-in.");
-          emit(
-            const DashboardErrorState(
-              errorMessage: 'User already signed in or exists.',
-            ),
-          );
-          return;
-        }
-
-        print("🟢 Email does not exist. Continuing authentication...");
-
+        // NOTE: no "email already exists" gate — Google is sign-in OR sign-up.
+        // The Firestore create-if-absent block below handles new vs. returning.
         final GoogleSignInAuthentication authenticate =
             await account.authentication;
         print("🟢 Retrieved authentication tokens.");

@@ -1,9 +1,10 @@
 // ignore_for_file: use_build_context_synchronously, deprecated_member_use
 
+import 'package:flatch/common/services/audio_fx.dart';
 import 'package:flatch/common/services/toast_service.dart';
+import 'package:flatch/common/widgets/waveform_view.dart';
 import 'package:flatch/cubits/audio_trim/audio_trim_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_xlider/flutter_xlider.dart';
 import 'package:flatch/common/widgets/audio_service.dart';
 import 'package:flatch/common/color/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,12 +16,24 @@ class AudioPlayerWidget extends StatefulWidget {
   final AudioService audioService;
   final void Function(String newPath, Duration newDuration) onTrimmed;
 
+  /// Called after an effect is baked into the clip, with the new file path.
+  final void Function(String newPath)? onProcessed;
+
+  /// Initial crop selection (seconds) to restore. When null (or end <= 0) the
+  /// clip opens un-cropped (0..min(15, total)). Used to preserve the user's
+  /// crop across effect changes and navigation.
+  final double? initialTrimStart;
+  final double? initialTrimEnd;
+
   const AudioPlayerWidget({
     super.key,
     required this.filePath,
     required this.fileName,
     required this.audioService,
     required this.onTrimmed,
+    this.onProcessed,
+    this.initialTrimStart,
+    this.initialTrimEnd,
   });
 
   @override
@@ -31,12 +44,19 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
   Duration? _duration;
   Duration? _position;
   bool _isPlaying = false;
+  List<double> _wave = const [];
 
   @override
   void initState() {
     super.initState();
     _initAudio();
     _setupListeners();
+    _loadWaveform();
+  }
+
+  Future<void> _loadWaveform() async {
+    final w = await AudioFx.waveform(widget.filePath);
+    if (mounted) setState(() => _wave = w);
   }
 
   Future<void> _initAudio() async {
@@ -51,10 +71,18 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
       return;
     }
     final total = d.inMilliseconds / 1000.0;
+    final defaultEnd = total > 15.0 ? 15.0 : total;
+    // Restore a saved crop if one was passed in; otherwise open un-cropped.
+    final start = (widget.initialTrimStart ?? 0.0).clamp(0.0, total);
+    final rawEnd =
+        (widget.initialTrimEnd != null && widget.initialTrimEnd! > 0)
+            ? widget.initialTrimEnd!
+            : defaultEnd;
+    final end = rawEnd.clamp(start, total);
     context.read<AudioTrimCubit>().initialize(
       originalPath: widget.filePath,
-      trimStart: 0.0,
-      trimEnd: total > 15.0 ? 15.0 : total,
+      trimStart: start,
+      trimEnd: end,
     );
     setState(() {
       _duration = d;
@@ -99,13 +127,6 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
     }
   }
 
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return '00:00';
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AudioTrimCubit, AudioTrimState>(
@@ -115,10 +136,6 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
         final totalSecs = (duration?.inMilliseconds ?? 1000) / 1000.0;
         final trimStart = state.trimStart.clamp(0.0, totalSecs);
         final trimEnd = state.trimEnd.clamp(0.0, totalSecs);
-        final selectedStart = Duration(
-          milliseconds: (trimStart * 1000).toInt(),
-        );
-        final selectedEnd = Duration(milliseconds: (trimEnd * 1000).toInt());
 
         return Card(
           elevation: 0,
@@ -174,140 +191,37 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
                 ),
                 const SizedBox(height: 20),
 
-                if (duration != null && totalSecs > 0.0) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).cardColor,
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: FlutterSlider(
-                            values: [trimStart, trimEnd],
-                            min: 0,
-                            max: totalSecs,
-                            rangeSlider: true,
-                            step: const FlutterSliderStep(step: 0.1),
-                            trackBar: FlutterSliderTrackBar(
-                              inactiveTrackBar: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              activeTrackBar: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              inactiveTrackBarHeight: 6,
-                              activeTrackBarHeight: 14,
-                            ),
-                            handler: FlutterSliderHandler(
-                              decoration: const BoxDecoration(),
-                              child: Container(
-                                width: 10,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                            rightHandler: FlutterSliderHandler(
-                              decoration: const BoxDecoration(),
-                              child: Container(
-                                width: 10,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                            onDragging: (handlerIndex, lowerValue, upperValue) {
-                              if (_isPlaying) {
-                                widget.audioService.pause();
-                                setState(() {
-                                  _isPlaying = false;
-                                });
-                              }
-                            },
-                            onDragCompleted: (
-                              handlerIndex,
-                              lowerValue,
-                              upperValue,
-                            ) {
-                              final maxDuration = 15.0;
-                              final total = totalSecs;
-                              double start = lowerValue.clamp(0.0, total);
-                              double end = upperValue.clamp(0.0, total);
-
-                              // Limit selection to maxDuration
-                              if ((end - start) > maxDuration) {
-                                if (handlerIndex == 0) {
-                                  end = start + maxDuration;
-                                } else {
-                                  start = end - maxDuration;
-                                }
-                              }
-
-                              // Ensure minimum selection window
-                              if ((end - start) < 0.15) {
-                                end = start + 0.15;
-                              }
-
-                              // Final clamp to avoid exceeding max
-                              start = start.clamp(0.0, total);
-                              end = end.clamp(0.0, total);
-
-                              context.read<AudioTrimCubit>().updateTrim(
-                                start,
-                                end,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
+                // Waveform of the clip, above the trim/seek bar.
+                if (_wave.isNotEmpty &&
+                    duration != null &&
+                    totalSecs > 0.0) ...[
+                  WaveformView(
+                    amplitudes: _wave,
+                    height: 46,
+                    progress:
+                        (_position?.inMilliseconds ?? 0) / (totalSecs * 1000),
                   ),
+                  const SizedBox(height: 8),
                 ],
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDuration(selectedStart),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        _formatDuration(selectedEnd),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                // One combined track: crop handles on each side + a live
+                // playback cursor showing where we are in the clip.
+                if (duration != null && totalSecs > 0.0)
+                  _TrimSeekBar(
+                    totalSecs: totalSecs,
+                    trimStart: trimStart,
+                    trimEnd: trimEnd,
+                    positionSecs: (_position?.inMilliseconds ?? 0) / 1000.0,
+                    onScrubStart: () {
+                      if (_isPlaying) {
+                        widget.audioService.pause();
+                        setState(() => _isPlaying = false);
+                      }
+                    },
+                    onCropChanged: (start, end) {
+                      context.read<AudioTrimCubit>().updateTrim(start, end);
+                    },
                   ),
-                ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -362,7 +276,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
 
                 if (state.error != null)
                   Center(
@@ -379,6 +293,213 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
           ),
         );
       },
+    );
+  }
+}
+
+/// One combined track: a grey clip track with a green selected region between
+/// two draggable crop handles, plus a live playback cursor showing where we are
+/// in the clip. Crop is committed on drag-end (via [onCropChanged]); the 15s
+/// max window and a small minimum window are enforced while dragging.
+class _TrimSeekBar extends StatefulWidget {
+  final double totalSecs;
+  final double trimStart;
+  final double trimEnd;
+  final double positionSecs;
+  final VoidCallback onScrubStart;
+  final void Function(double start, double end) onCropChanged;
+
+  const _TrimSeekBar({
+    required this.totalSecs,
+    required this.trimStart,
+    required this.trimEnd,
+    required this.positionSecs,
+    required this.onScrubStart,
+    required this.onCropChanged,
+  });
+
+  @override
+  State<_TrimSeekBar> createState() => _TrimSeekBarState();
+}
+
+class _TrimSeekBarState extends State<_TrimSeekBar> {
+  static const double _handleW = 14;
+  static const double _touchW = 36;
+  static const double _handleH = 30;
+  static const double _trackH = 6;
+  static const double _activeH = 10;
+  static const double _cursorW = 3;
+  static const double _cursorH = 34;
+  static const double _rowH = 40;
+  static const double _maxWindow = 15.0;
+  static const double _minWindow = 0.15;
+
+  // Live values while a handle is being dragged (committed on drag end).
+  double? _dragStart;
+  double? _dragEnd;
+
+  double get _effStart => _dragStart ?? widget.trimStart;
+  double get _effEnd => _dragEnd ?? widget.trimEnd;
+
+  String _fmt(double secs) {
+    final d = Duration(milliseconds: (secs * 1000).round());
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  TextStyle get _lbl => TextStyle(
+    color: Colors.grey[600],
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+  );
+
+  Widget _handle() => Center(
+    child: Container(
+      width: _handleW,
+      height: _handleH,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.totalSecs <= 0 ? 1.0 : widget.totalSecs;
+    final cursorColor = Theme.of(context).colorScheme.onSurface;
+
+    return Column(
+      children: [
+        LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final usable = (w - _handleW) <= 0 ? 1.0 : (w - _handleW);
+            double xCenter(double v) =>
+                (v / total).clamp(0.0, 1.0) * usable + _handleW / 2;
+
+            final startX = xCenter(_effStart);
+            final endX = xCenter(_effEnd);
+            final posX = xCenter(widget.positionSecs.clamp(0.0, total));
+            final mid = _rowH / 2;
+
+            void onLeftDrag(DragUpdateDetails d) {
+              final deltaV = (d.delta.dx / usable) * total;
+              var s = _effStart + deltaV;
+              s = s.clamp(0.0, _effEnd - _minWindow);
+              if (_effEnd - s > _maxWindow) s = _effEnd - _maxWindow;
+              setState(() => _dragStart = s.clamp(0.0, total));
+            }
+
+            void onRightDrag(DragUpdateDetails d) {
+              final deltaV = (d.delta.dx / usable) * total;
+              var e = _effEnd + deltaV;
+              e = e.clamp(_effStart + _minWindow, total);
+              if (e - _effStart > _maxWindow) e = _effStart + _maxWindow;
+              setState(() => _dragEnd = e.clamp(0.0, total));
+            }
+
+            return SizedBox(
+              height: _rowH,
+              width: double.infinity,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // base (inactive) track
+                  Positioned(
+                    left: _handleW / 2,
+                    right: _handleW / 2,
+                    top: mid - _trackH / 2,
+                    child: Container(
+                      height: _trackH,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  // selected (crop) region
+                  Positioned(
+                    left: startX,
+                    width: (endX - startX) <= 0 ? 0.0 : (endX - startX),
+                    top: mid - _activeH / 2,
+                    child: Container(
+                      height: _activeH,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  // playback cursor
+                  Positioned(
+                    left: posX - _cursorW / 2,
+                    top: mid - _cursorH / 2,
+                    child: Container(
+                      width: _cursorW,
+                      height: _cursorH,
+                      decoration: BoxDecoration(
+                        color: cursorColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // left crop handle
+                  Positioned(
+                    left: startX - _touchW / 2,
+                    top: mid - _handleH / 2,
+                    width: _touchW,
+                    height: _handleH,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (_) => widget.onScrubStart(),
+                      onHorizontalDragUpdate: onLeftDrag,
+                      onHorizontalDragEnd: (_) {
+                        widget.onCropChanged(_effStart, _effEnd);
+                        setState(() => _dragStart = null);
+                      },
+                      child: _handle(),
+                    ),
+                  ),
+                  // right crop handle
+                  Positioned(
+                    left: endX - _touchW / 2,
+                    top: mid - _handleH / 2,
+                    width: _touchW,
+                    height: _handleH,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (_) => widget.onScrubStart(),
+                      onHorizontalDragUpdate: onRightDrag,
+                      onHorizontalDragEnd: (_) {
+                        widget.onCropChanged(_effStart, _effEnd);
+                        setState(() => _dragEnd = null);
+                      },
+                      child: _handle(),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_fmt(_effStart), style: _lbl),
+              Text(
+                '${_fmt(widget.positionSecs.clamp(0.0, total))} / ${_fmt(total)}',
+                style: _lbl,
+              ),
+              Text(_fmt(_effEnd), style: _lbl),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

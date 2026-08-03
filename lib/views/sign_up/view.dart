@@ -173,25 +173,76 @@ class _IndividualSignupState extends State<IndividualSignup> {
           Align(
             alignment: Alignment.bottomLeft,
             child: TextWidget(
-              text: "Start leaning with create your account",
+              text: "Create your account to join the community",
               size: screenHeight < 813 ? 12 : 14,
               weight: FontWeight.w700,
               textAlign: TextAlign.center,
               color: Colors.grey,
             ),
           ),
-          const Gap(30),
+          const Gap(16),
+          // Returning users land here from the age gate, so give them a way out
+          // without scrolling the whole registration form.
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextWidget(
+                  text: "Already have an account?",
+                  size: screenHeight < 813 ? 12 : 14,
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color?.withOpacity(.7),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () {
+                    while (GoRouter.of(context).canPop()) {
+                      GoRouter.of(context).pop();
+                    }
+                    GoRouter.of(context).pushNamed(AppRoute.login.name);
+                  },
+                  child: Text(
+                    "Sign In",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: screenHeight < 813 ? 13 : 15,
+                      decoration: TextDecoration.underline,
+                      decorationColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Gap(18),
 
           TextFormFieldWithText(
             controller: nameController,
             textError: nameError,
-
+            heading: "Username",
+            hint: "Pick a username others will see",
+            prefixIcon: const Icon(
+              CupertinoIcons.at,
+              color: AppColors.primary,
+            ),
             key: _nameFieldKey,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return "Name is required";
-              } else if (value.trim().length > 100) {
-                return "Name must be under 100 characters";
+              final v = (value ?? '').trim();
+              if (v.isEmpty) {
+                return "Username is required";
+              } else if (v.length < 3) {
+                return "Username must be at least 3 characters";
+              } else if (v.length > 20) {
+                return "Username must be 20 characters or fewer";
+              } else if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(v)) {
+                return "Use letters, numbers, underscores or periods only";
               }
               return null;
             },
@@ -338,7 +389,7 @@ class _IndividualSignupState extends State<IndividualSignup> {
                   if (p0 == null || p0.isEmpty) {
                     return "Please confirm your password";
                   } else if (p0 != passwordController.text) {
-                    return "Passwords do not match!";
+                    return "Passwords do not match.";
                   }
                   return null;
                 },

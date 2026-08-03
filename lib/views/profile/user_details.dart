@@ -403,7 +403,7 @@ class _UsersDetailsScreenState extends State<UsersDetailsScreen> {
                                     onShare: () async {
                                       await ShareService.instance.shareFart(
                                         fartId: fart.id,
-                                        title: 'Listen to this fart!',
+                                        title: 'For your review.',
                                       );
                                     },
                                     commentCount: fart.commentCount,

@@ -336,7 +336,7 @@ class _AdminFetchFartsState extends State<AdminFetchFarts> {
                         onShare: () async {
                           await ShareService.instance.shareFart(
                             fartId: fart.id,
-                            title: 'Listen to this fart!',
+                            title: 'For your review.',
                           );
                         },
                         reportCount: fart.reportCount,

@@ -67,11 +67,9 @@ class _LoginViewState extends State<LoginView> {
                 ),
           );
         } else if (state is LoginSuccessState) {
-          final user = state.user;
           await Future.delayed(Duration.zero);
-          if (!user.emailVerified) {
-            context.goNamed(AppRoute.emailNotVerified.name);
-          } else if (state.trialExpired) {
+          // Unverified users are let in to browse; posting prompts them.
+          if (state.trialExpired) {
             context.goNamed(AppRoute.userSubscriptionEnded.name);
           } else {
             context.goNamed(AppRoute.dashboard.name);
@@ -81,6 +79,20 @@ class _LoginViewState extends State<LoginView> {
       },
       builder: (context, state) {
         return Scaffold(
+          // Login is now reachable by PUSH from the age gate (guest taps
+          // "Already have an account?"). Without an AppBar there was no visible
+          // way back, so surface one whenever there is something to pop.
+          appBar:
+              Navigator.of(context).canPop()
+                  ? AppBar(
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  )
+                  : null,
           body: Stack(
             children: [
               buildForm(context, state),

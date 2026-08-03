@@ -109,7 +109,7 @@ class _UpdateUsernameViewState extends State<UpdateUsernameView> {
                     ),
                     const Gap(20),
                     const TextWidget(
-                      text: "Username updated successfully!",
+                      text: "Username updated.",
                       size: 18,
                       textAlign: TextAlign.center,
                     ),

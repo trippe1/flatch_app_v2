@@ -8,6 +8,7 @@ import 'package:flatch/common/dialogues/upload_image.dart';
 import 'package:flatch/common/local_db/local_database.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/url_services.dart';
+import 'package:flatch/common/services/fwb_service.dart';
 import 'package:flatch/common/widgets/progress_indicator.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/cubits/user_app_dashboard/user_app_dashboard_cubit.dart';
@@ -26,14 +27,24 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
+  bool? _fwbNotif; // null until loaded
+
   @override
   void initState() {
-    BlocProvider.of<ProfileManagmentBloc>(context).add(GetUserDetailsEvent());
+    // Settings is guest-accessible; only pull the account profile when a user
+    // is actually signed in (otherwise the fetch errors out on no user).
+    if (FirebaseAuth.instance.currentUser != null) {
+      BlocProvider.of<ProfileManagmentBloc>(context).add(GetUserDetailsEvent());
+      FwbService.notificationsEnabled().then((v) {
+        if (mounted) setState(() => _fwbNotif = v);
+      });
+    }
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool signedIn = FirebaseAuth.instance.currentUser != null;
     double height = MediaQuery.of(context).size.height;
     return Scaffold(
       appBar: AppBar(
@@ -62,7 +73,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           },
         ),
         title: Text(
-          "Profile",
+          signedIn ? "Profile" : "Settings",
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).iconTheme.color,
@@ -71,50 +82,148 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
         centerTitle: true,
       ),
-      body: BlocBuilder<ProfileManagmentBloc, ProfileManagmentState>(
-        builder: (context, state) {
-          switch (state) {
-            case ProfileManagmentInitial():
-              return SizedBox();
-            case ProfileManagmentLoading():
-              return const Center(child: KProgressIndicator());
-            case ProfileManagmentLoaded():
-              return _successState(context, state);
-            case ProfileManagmentError():
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error, color: Colors.black, size: height * 0.25),
-                  const Gap(10),
-                  const TextWidget(
-                    text: "Error occured!",
-                    size: 22,
-                    weight: FontWeight.bold,
+      body:
+          !signedIn
+              ? _guestSettings(context)
+              : BlocBuilder<ProfileManagmentBloc, ProfileManagmentState>(
+                builder: (context, state) {
+                  switch (state) {
+                    case ProfileManagmentInitial():
+                      return SizedBox();
+                    case ProfileManagmentLoading():
+                      return const Center(child: KProgressIndicator());
+                    case ProfileManagmentLoaded():
+                      return _successState(context, state);
+                    case ProfileManagmentError():
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error,
+                            color: Colors.black,
+                            size: height * 0.25,
+                          ),
+                          const Gap(10),
+                          const TextWidget(
+                            text: "An error occurred.",
+                            size: 22,
+                            weight: FontWeight.bold,
+                          ),
+                          const Gap(20),
+                          TextWidget(
+                            text: state.error,
+                            color: Colors.black.withOpacity(.6),
+                            padding: 60,
+                            textAlign: TextAlign.center,
+                          ),
+                          const Gap(40),
+                          TextButton(
+                            onPressed:
+                                () => context.read<ProfileManagmentBloc>().add(
+                                  GetUserDetailsEvent(),
+                                ),
+                            child: const Text("Retry"),
+                          ),
+                        ],
+                      );
+                    case UploadingUserImageLoadingState():
+                      return imageUploadingLoadingState();
+                    case UploadingUserErrorState():
+                      return imageUploadingErrorState(state, context);
+                  }
+                },
+              ),
+    );
+  }
+
+  /// Account-free settings shown to guests: theme, legal, about, buy-device,
+  /// support, plus a prompt to create an account. No profile/library/account
+  /// options (those require an account).
+  Widget _guestSettings(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextWidget(
+                text: 'Guest mode',
+                size: 16,
+                weight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'You can use the device and its built-in sounds without an '
+                'account. Create one to post, comment, vote, and manage your '
+                'library.',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  const Gap(20),
-                  TextWidget(
-                    text: state.error,
-                    color: Colors.black.withOpacity(.6),
-                    padding: 60,
-                    textAlign: TextAlign.center,
-                  ),
-                  const Gap(40),
-                  TextButton(
-                    onPressed:
-                        () => context.read<ProfileManagmentBloc>().add(
-                          GetUserDetailsEvent(),
-                        ),
-                    child: const Text("Retry"),
-                  ),
-                ],
-              );
-            case UploadingUserImageLoadingState():
-              return imageUploadingLoadingState();
-            case UploadingUserErrorState():
-              return imageUploadingErrorState(state, context);
-          }
-        },
-      ),
+                  onPressed:
+                      () =>
+                          GoRouter.of(context).pushNamed(AppRoute.ageGate.name),
+                  child: const Text('Create account / Sign in'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildSectionHeader("🛍️ Device & Legal"),
+        _buildActionTile(
+          icon: Icons.info_outline,
+          label: "Buy the Device",
+          onTap: () => GoRouter.of(context).pushNamed(AppRoute.buyDevice.name),
+        ),
+        _buildActionTile(
+          icon: CupertinoIcons.eyeglasses,
+          label: "Terms of Use",
+          onTap:
+              () =>
+                  UrlLauncherService.instance.launchTermsAndConditions(context),
+        ),
+        _buildActionTile(
+          icon: Icons.privacy_tip_outlined,
+          label: "Privacy Policy",
+          onTap: () => UrlLauncherService.instance.launchPrivacyPolicy(context),
+        ),
+        _buildActionTile(
+          icon: Icons.info_outline,
+          label: "About",
+          onTap: () => GoRouter.of(context).pushNamed(AppRoute.about.name),
+        ),
+        const SizedBox(height: 20),
+        _buildSectionHeader("Appearance"),
+        _buildThemeSwitchTile(),
+        const SizedBox(height: 20),
+        _buildSectionHeader("Support"),
+        _buildActionTile(
+          icon: Icons.mail_outline,
+          label: "Contact Us",
+          onTap: () => GoRouter.of(context).pushNamed(AppRoute.contactUs.name),
+        ),
+        const SizedBox(height: 50),
+      ],
     );
   }
 
@@ -132,7 +241,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
         const Gap(10),
         const TextWidget(
-          text: "Error occured!",
+          text: "An error occurred.",
           size: 22,
           weight: FontWeight.bold,
         ),
@@ -300,6 +409,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
+            _buildSectionHeader("👯 Farts with Buddies"),
+            _buildActionTile(
+              icon: Icons.groups_rounded,
+              label: "Farts with Buddies",
+              onTap:
+                  () => GoRouter.of(context).pushNamed(AppRoute.fwbHome.name),
+            ),
+            _buildFwbNotificationsTile(),
+
+            const SizedBox(height: 20),
             _buildSectionHeader("📁 Content"),
             _buildActionTile(
               icon: CupertinoIcons.upload_circle,
@@ -323,6 +442,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   () => UrlLauncherService.instance.launchTermsAndConditions(
                     context,
                   ),
+            ),
+            _buildActionTile(
+              icon: Icons.privacy_tip_outlined,
+              label: "Privacy Policy",
+              onTap:
+                  () =>
+                      UrlLauncherService.instance.launchPrivacyPolicy(context),
+            ),
+            _buildActionTile(
+              icon: Icons.info_outline,
+              label: "About",
+              onTap: () => GoRouter.of(context).pushNamed(AppRoute.about.name),
             ),
 
             const SizedBox(height: 20),
@@ -487,6 +618,53 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFwbNotificationsTile() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.notifications_active_outlined,
+              color: Theme.of(context).iconTheme.color,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextWidget(
+              text: 'Notify me about new posts',
+              size: 16,
+              weight: FontWeight.bold,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+          Switch(
+            value: _fwbNotif ?? true,
+            onChanged:
+                _fwbNotif == null
+                    ? null
+                    : (value) {
+                      setState(() => _fwbNotif = value);
+                      FwbService.setNotifications(value);
+                    },
+            activeColor: AppColors.primary,
+            inactiveThumbColor: AppColors.secondary,
+          ),
+        ],
       ),
     );
   }

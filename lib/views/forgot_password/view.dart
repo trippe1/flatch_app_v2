@@ -71,30 +71,71 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
               return initialState();
             case ForgotPasswordLoading():
               return const Center(child: KProgressIndicator());
+            case ForgotPasswordAccountNotFound():
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Center(
+                    child: Icon(
+                      Icons.person_off_outlined,
+                      color: AppColors.primary,
+                      size: MediaQuery.of(context).size.width * 0.22,
+                    ),
+                  ),
+                  const Gap(10),
+                  const TextWidget(
+                    text: "No account found",
+                    size: 22,
+                    weight: FontWeight.bold,
+                  ),
+                  const Gap(20),
+                  TextWidget(
+                    text:
+                        "There's no Flatch account for ${state.email}, so we "
+                        "didn't send a reset email. Check the address for "
+                        "typos, or create an account.",
+                    padding: 40,
+                    textAlign: TextAlign.center,
+                  ),
+                  const Gap(30),
+                  TextButton(
+                    onPressed:
+                        () => context.read<ForgotPasswordBloc>().add(
+                          ResetStateEvent(),
+                        ),
+                    child: const Text("Try a different email"),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      context.read<ForgotPasswordBloc>().add(ResetStateEvent());
+                      GoRouter.of(context).pop();
+                    },
+                    child: const Text("Back to Login"),
+                  ),
+                ],
+              );
             case ForgotPasswordError():
               return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Center(
                     child: Icon(
                       Icons.error_outline,
-                      color: Colors.black,
-                      size: MediaQuery.of(context).size.width * 0.25,
+                      color: AppColors.primary,
+                      size: MediaQuery.of(context).size.width * 0.22,
                     ),
                   ),
-                  const Center(
-                    child: TextWidget(
-                      text: "Error Occured",
-                      size: 22,
-                      weight: FontWeight.bold,
-                    ),
+                  const Gap(10),
+                  const TextWidget(
+                    text: "Couldn't send the email",
+                    size: 22,
+                    weight: FontWeight.bold,
                   ),
                   const Gap(20),
-                  Center(
-                    child: TextWidget(
-                      text: state.e.toString(),
-                      padding: 60,
-                      textAlign: TextAlign.center,
-                    ),
+                  TextWidget(
+                    text: state.message,
+                    padding: 40,
+                    textAlign: TextAlign.center,
                   ),
                   const Gap(30),
                   TextButton(
@@ -104,6 +145,13 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
                       );
                     },
                     child: const Text("Retry"),
+                  ),
+                  TextButton(
+                    onPressed:
+                        () => context.read<ForgotPasswordBloc>().add(
+                          ResetStateEvent(),
+                        ),
+                    child: const Text("Use a different email"),
                   ),
                 ],
               );
@@ -121,7 +169,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
 
                   const Gap(10),
                   const TextWidget(
-                    text: "Success!",
+                    text: "Reset email sent.",
                     size: 22,
                     weight: FontWeight.bold,
                   ),

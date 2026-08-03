@@ -27,6 +27,22 @@ class DeepLinkService {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = navigatorKey.currentContext;
       if (context != null) {
+        // "Farts with Buddies" invite links. Handle both the https universal
+        // link (https://flik.me/fwb/<id> → host "flik.me", path "/fwb/<id>")
+        // and a custom-scheme form (flatch://fwb/<id> → host "fwb").
+        final bool isHttp = uri.scheme == 'http' || uri.scheme == 'https';
+        final segments = <String>[
+          if (!isHttp && uri.host.isNotEmpty) uri.host,
+          ...uri.pathSegments,
+        ];
+        final fwbIndex = segments.indexOf('fwb');
+        if (fwbIndex != -1 && fwbIndex + 1 < segments.length) {
+          final groupId = segments[fwbIndex + 1];
+          debugPrint('📍 FWB invite → /fwb/$groupId');
+          GoRouter.of(context).go('/fwb/$groupId');
+          return;
+        }
+
         String fullPath;
         if (uri.host.isNotEmpty) {
           fullPath = '/${uri.host}${uri.path}';

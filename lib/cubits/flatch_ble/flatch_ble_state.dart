@@ -2,10 +2,17 @@ part of 'flatch_ble_cubit.dart';
 
 class FlatchBleState extends Equatable {
   final bool isBluetoothOn;
+  // Explicitly OFF (adapter reported off) — distinct from "not yet determined"
+  // (unknown/unauthorized), which on iOS is the state before BLE is first used.
+  // Only show "Bluetooth is disabled" when this is true.
+  final bool isBluetoothOff;
   final bool isLoading;
   final String? error;
 
   final List<BluetoothDevice> devices;
+  // Signal strength (RSSI, dBm) per device, keyed by remoteId — for the
+  // signal indicator and closest-first ordering in the pairing list.
+  final Map<String, int> deviceRssi;
   final BluetoothDevice? connectedDevice;
 
   // Local downloaded sounds
@@ -26,14 +33,23 @@ class FlatchBleState extends Equatable {
   final String? connectingDeviceId;
   final List<File> queuedLibrarySounds;
 
+  // Bluetooth access was requested and refused. `permanently` means the OS will
+  // no longer show a prompt, so the only route left is app settings.
+  final bool blePermissionDenied;
+  final bool blePermissionPermanentlyDenied;
+
 
 
 
   const FlatchBleState({
+    this.blePermissionDenied = false,
+    this.blePermissionPermanentlyDenied = false,
     this.isBluetoothOn = false,
+    this.isBluetoothOff = false,
     this.isLoading = false,
     this.error,
     this.devices = const [],
+    this.deviceRssi = const {},
     this.connectedDevice,
     this.soundFiles = const [],
     this.isCodeVerified = false,
@@ -51,10 +67,14 @@ class FlatchBleState extends Equatable {
   });
 
   FlatchBleState copyWith({
+    bool? blePermissionDenied,
+    bool? blePermissionPermanentlyDenied,
     bool? isBluetoothOn,
+    bool? isBluetoothOff,
     bool? isLoading,
     String? error,
     List<BluetoothDevice>? devices,
+    Map<String, int>? deviceRssi,
     BluetoothDevice? connectedDevice,
     List<File>? soundFiles,
     bool? isCodeVerified,
@@ -71,10 +91,15 @@ class FlatchBleState extends Equatable {
 
   }) {
     return FlatchBleState(
+      blePermissionDenied: blePermissionDenied ?? this.blePermissionDenied,
+      blePermissionPermanentlyDenied:
+          blePermissionPermanentlyDenied ?? this.blePermissionPermanentlyDenied,
       isBluetoothOn: isBluetoothOn ?? this.isBluetoothOn,
+      isBluetoothOff: isBluetoothOff ?? this.isBluetoothOff,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       devices: devices ?? this.devices,
+      deviceRssi: deviceRssi ?? this.deviceRssi,
       connectedDevice: connectedDevice ?? this.connectedDevice,
       soundFiles: soundFiles ?? this.soundFiles,
       isCodeVerified: isCodeVerified ?? this.isCodeVerified,
@@ -94,10 +119,14 @@ class FlatchBleState extends Equatable {
 
   @override
   List<Object?> get props => [
+    blePermissionDenied,
+    blePermissionPermanentlyDenied,
     isBluetoothOn,
+    isBluetoothOff,
     isLoading,
     error,
     devices,
+    deviceRssi,
     connectedDevice,
     soundFiles,
     isCodeVerified,

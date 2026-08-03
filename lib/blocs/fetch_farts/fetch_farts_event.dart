@@ -36,12 +36,14 @@ final class _FartsUpdated extends FetchFartsEvent {
 }
 
 final class FetchTopFarts extends FetchFartsEvent {
-  final String? category;
+  /// Free-text search over fart titles, usernames and comment text.
+  final String? searchQuery;
+  final FartFilter filter;
 
-  const FetchTopFarts({this.category});
+  const FetchTopFarts({this.searchQuery, this.filter = FartFilter.sortBy});
 
   @override
-  List<Object?> get props => [category];
+  List<Object?> get props => [searchQuery, filter];
 }
 
 final class ReportFart extends FetchFartsEvent {

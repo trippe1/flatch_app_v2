@@ -34,7 +34,7 @@ Click the link to listen inside the app!
 
   Future<void> shareFart({
     required String fartId,
-    String subject = 'Check out this sound!',
+    String subject = 'A sound for your review.',
     String title = 'Share Sound',
   }) async {
     try {
@@ -60,7 +60,7 @@ Tap the link to listen inside the app!
 
   /// Share just the static text (app install links)
   Future<void> shareAppText({
-    String subject = 'Check out Flatch!',
+    String subject = 'Flatch. A precision flatulence instrument.',
     String title = 'Share App',
   }) async {
     try {

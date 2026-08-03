@@ -96,7 +96,7 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val command =
-                            "-y -i \"$inputPath\" -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 $codecArg \"${outputFile.absolutePath}\""
+                            "-y -i \"$inputPath\" -ac 1 -ar 22050 -af loudnorm=I=-14:TP=-1.0:LRA=11 $codecArg \"${outputFile.absolutePath}\""
 
                         FFmpegKit.executeAsync(command) { session ->
                             val rc: ReturnCode = session.returnCode
@@ -128,7 +128,7 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val command =
-                            "-y -ss $start -t $duration -i \"$inputPath\" -ac 1 -ar 44100 -af loudnorm=I=-14:TP=-1.0:LRA=11 $codecArg \"${outputFile.absolutePath}\""
+                            "-y -ss $start -t $duration -i \"$inputPath\" -ac 1 -ar 22050 -af loudnorm=I=-14:TP=-1.0:LRA=11 $codecArg \"${outputFile.absolutePath}\""
 
                         FFmpegKit.executeAsync(command) { session ->
                             val rc: ReturnCode = session.returnCode
@@ -136,6 +136,59 @@ class MainActivity : FlutterActivity() {
                                 result.success(outputFile.absolutePath)
                             } else {
                                 result.error("FFMPEG_ERROR", "Trim failed", null)
+                            }
+                        }
+                    }
+
+                    // 🎛️ Apply an audio effect filter chain (reverb/echo/denoise)
+                    "applyAudioFilter" -> {
+                        val inputPath: String? = call.argument<String>("inputPath")
+                        val filter: String = call.argument<String>("filter") ?: ""
+                        val outputExt: String = call.argument<String>("outputExt") ?: "mp3"
+
+                        if (inputPath.isNullOrEmpty() || filter.isEmpty()) {
+                            result.error("INVALID_ARGS", "Missing input path or filter", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val outputFile = File(getExternalFilesDir(null), "fx_${System.currentTimeMillis()}.$outputExt")
+                        val codecArg = when {
+                            outputExt.equals("mp3", true) -> "-c:a libmp3lame -q:a 2"
+                            outputExt.equals("wav", true) -> "-c:a pcm_s16le"
+                            else -> "-c:a aac"
+                        }
+
+                        val command =
+                            "-y -i \"$inputPath\" -ac 1 -ar 22050 -af \"$filter,loudnorm=I=-14:TP=-1.0:LRA=11\" $codecArg \"${outputFile.absolutePath}\""
+
+                        FFmpegKit.executeAsync(command) { session ->
+                            if (session.returnCode.isValueSuccess) {
+                                result.success(outputFile.absolutePath)
+                            } else {
+                                result.error("FFMPEG_ERROR", "Effect failed", null)
+                            }
+                        }
+                    }
+
+                    // 〰️ Decode to raw PCM (s16le mono) for waveform rendering
+                    "extractPcm" -> {
+                        val inputPath: String? = call.argument<String>("inputPath")
+                        val sampleRate: Int = call.argument<Int>("sampleRate") ?: 8000
+
+                        if (inputPath.isNullOrEmpty()) {
+                            result.error("INVALID_ARGS", "Missing input path", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val outputFile = File(getExternalFilesDir(null), "wave_${System.currentTimeMillis()}.pcm")
+                        val command =
+                            "-y -i \"$inputPath\" -ac 1 -ar $sampleRate -f s16le \"${outputFile.absolutePath}\""
+
+                        FFmpegKit.executeAsync(command) { session ->
+                            if (session.returnCode.isValueSuccess) {
+                                result.success(outputFile.absolutePath)
+                            } else {
+                                result.error("FFMPEG_ERROR", "PCM extract failed", null)
                             }
                         }
                     }

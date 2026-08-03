@@ -23,39 +23,25 @@ class UploadImageDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Gap(10),
-            const TextWidget(text: "Update profile image using"),
+            const TextWidget(text: "Select a profile image from your library."),
             const Gap(15),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(
-                2,
-                (index) => TextButton(
-                  onPressed: () {
-                    context.read<ProfileManagmentBloc>().add(
-                      UploadUserImageEvent(
-                        source:
-                            index == 0
-                                ? ImageSource.camera
-                                : ImageSource.gallery,
-                      ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  style: const ButtonStyle().copyWith(
-                    minimumSize: const WidgetStatePropertyAll(Size(120, 40)),
-                    textStyle: WidgetStatePropertyAll(
-                      style(size: 16, weight: FontWeight.bold),
-                    ),
-                    backgroundColor: WidgetStatePropertyAll(
-                      index == 0 ? AppColors.background : null,
-                    ),
-                    foregroundColor: WidgetStatePropertyAll(
-                      index == 0 ? AppColors.primary : null,
-                    ),
-                  ),
-                  child: Text(index == 0 ? "Camera" : "Gallery"),
+            // Gallery only — Flatch does not use the camera.
+            TextButton(
+              onPressed: () {
+                context.read<ProfileManagmentBloc>().add(
+                  UploadUserImageEvent(source: ImageSource.gallery),
+                );
+                Navigator.pop(context);
+              },
+              style: const ButtonStyle().copyWith(
+                minimumSize: const WidgetStatePropertyAll(Size(180, 44)),
+                textStyle: WidgetStatePropertyAll(
+                  style(size: 16, weight: FontWeight.bold),
                 ),
+                foregroundColor:
+                    const WidgetStatePropertyAll(AppColors.primary),
               ),
+              child: const Text("Choose from Library"),
             ),
           ],
         ),

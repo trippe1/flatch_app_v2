@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flatch/common/color/app_colors.dart';
+import 'package:flatch/common/services/age_gate_service.dart';
 import 'package:flatch/common/widgets/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +48,7 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
 
   Timer? _timer;
   double _level = 0.0;
+  StreamSubscription<double>? _levelSub;
 
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
 
@@ -69,12 +71,15 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
   @override
   void dispose() {
     _timer?.cancel();
+    _levelSub?.cancel();
     _growCtrl.dispose();
     _recorder.closeRecorder();
     super.dispose();
   }
 
   Future<void> _initRecorder() async {
+    // COPPA: never request the mic on an age-blocked device.
+    if (await AgeGateService.instance.isBlocked()) return;
     final status = await Permission.microphone.request();
     if (status.isGranted) {
       await _recorder.openRecorder();
@@ -91,8 +96,7 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
       if (!mounted || !_isRecording || _isPaused) return;
       setState(() {
         _recordCentis = (_recordCentis + 10).clamp(0, kMaxCentis);
-        // simple fake level for pulse
-        _level = 0.15 + 0.85 * ((DateTime.now().millisecond % 100) / 100);
+        // _level is driven by the real mic amplitude stream (see _start).
       });
 
       if (_recordCentis >= kMaxCentis) {
@@ -125,13 +129,23 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
         _segmentStartCentis = _recordCentis;
       });
       _startTicker();
+      // Drive the wheel pulse from the real microphone level.
+      _levelSub?.cancel();
+      _levelSub = widget.audioService.recordingLevelStream.listen((lvl) {
+        if (mounted && _isRecording && !_isPaused) {
+          setState(() => _level = lvl);
+        }
+      });
     }
   }
 
   Future<void> _pause() async {
     await widget.audioService.pauseRecording();
     _closeClipAtCurrent();
-    setState(() => _isPaused = true);
+    setState(() {
+      _isPaused = true;
+      _level = 0.0;
+    });
     _stopTicker();
   }
 
@@ -148,9 +162,12 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
     final result = await widget.audioService.stopRecording();
 
     _stopTicker();
+    _levelSub?.cancel();
+    _levelSub = null;
     setState(() {
       _isRecording = false;
       _isPaused = false;
+      _level = 0.0;
     });
 
     if (result != null) {
@@ -283,12 +300,15 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget>
       await _recorderChannel.invokeMethod<void>('discardAllClips');
     } catch (_) {}
 
+    _levelSub?.cancel();
+    _levelSub = null;
     setState(() {
       _clips.clear();
       _recordCentis = 0;
       _segmentStartCentis = null;
       _isPaused = false;
       _isRecording = false;
+      _level = 0.0;
       _growCtrl.reset();
     });
 
@@ -608,14 +628,14 @@ class _WheelerPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeWidth = progressStroke
-          ..color = const Color(0xFF4ADE1A);
+          ..color = AppColors.primary;
 
     final progressPaint =
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeWidth = progressStroke
-          ..color = const Color(0xFF4ADE1A);
+          ..color = AppColors.primary;
 
     final markerPaint =
         Paint()
@@ -677,7 +697,15 @@ class VideoToAudioWidget extends StatefulWidget {
   final void Function(String path, String name, String type, Duration? duration)
   onAudioExtracted;
 
-  const VideoToAudioWidget({super.key, required this.onAudioExtracted});
+  /// When true, the Photos picker opens automatically on mount (i.e. as soon as
+  /// the user selects the "Upload from Photos" tile).
+  final bool autoStart;
+
+  const VideoToAudioWidget({
+    super.key,
+    required this.onAudioExtracted,
+    this.autoStart = false,
+  });
 
   @override
   State<VideoToAudioWidget> createState() => _VideoToAudioWidgetState();
@@ -686,8 +714,33 @@ class VideoToAudioWidget extends StatefulWidget {
 class _VideoToAudioWidgetState extends State<VideoToAudioWidget> {
   bool _isProcessing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pickVideoAndExtractAudio();
+      });
+    }
+  }
+
   Future<void> _pickVideoAndExtractAudio() async {
     try {
+      // Ask for Photos access ONLY here — when the user is actually picking a
+      // video to upload from their library (never at app startup).
+      if (Platform.isIOS) {
+        final status = await Permission.photos.request();
+        if (!status.isGranted && !status.isLimited) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Photos access is needed to pick a video.'),
+              ),
+            );
+          }
+          return;
+        }
+      }
       final result = await FilePicker.platform.pickFiles(type: FileType.video);
       if (result != null && result.files.single.path != null) {
         setState(() => _isProcessing = true);
@@ -747,7 +800,15 @@ class AudioPickerWidget extends StatefulWidget {
   final void Function(String path, String name, String type, Duration? duration)
   onAudioSelected;
 
-  const AudioPickerWidget({super.key, required this.onAudioSelected});
+  /// When true, the Files picker opens automatically on mount (i.e. as soon as
+  /// the user selects the "Upload from Files" tile).
+  final bool autoStart;
+
+  const AudioPickerWidget({
+    super.key,
+    required this.onAudioSelected,
+    this.autoStart = false,
+  });
 
   @override
   State<AudioPickerWidget> createState() => _AudioPickerWidgetState();
@@ -755,6 +816,16 @@ class AudioPickerWidget extends StatefulWidget {
 
 class _AudioPickerWidgetState extends State<AudioPickerWidget> {
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pickAudio();
+      });
+    }
+  }
 
   Future<void> _pickAudio() async {
     try {

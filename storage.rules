@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Audio clips live under farts/{uid}/<timestamp>.<ext>.
+    // Any signed-in user may listen; only the owner may upload/replace/delete
+    // files in their own folder. Size + type capped to stop abuse.
+    match /farts/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*|video/.*|application/octet-stream');
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Profile images are stored at images/<timestamp>.png (not namespaced by
+    // uid), so we can only scope by auth + type/size here.
+    match /images/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Everything else: denied by default.
+  }
+}

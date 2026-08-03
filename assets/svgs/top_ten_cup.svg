@@ -1,0 +1,82 @@
+<svg viewBox="51 28 410 410" xmlns="http://www.w3.org/2000/svg">
+  <!-- Top Ten leaderboard mark: a trophy engraved "TOP 10" in gold, with
+       rising gas. Bubble language matches flatch_mark.svg — Signal Green
+       circles that shrink and fade as they rise, staggered side to side.
+       The lettering is drawn as shapes (not <text>) so it renders identically
+       regardless of font availability; counters are punched with the bowl's
+       own green so they read as engraving. -->
+
+  <!-- gas escaping above the rim (shrinking + fading as it rises) -->
+  <g fill="#00B140">
+    <circle cx="256" cy="112" r="18" opacity="0.72"/>
+    <circle cx="224" cy="70" r="12" opacity="0.50"/>
+    <circle cx="274" cy="36" r="8" opacity="0.32"/>
+  </g>
+
+  <!-- loop handles: anchored under the rim and back onto the bowl's side -->
+  <g fill="none" stroke="#00B140" stroke-width="20" stroke-linecap="round">
+    <path d="M 164 168 C 100 164 66 200 74 236 C 82 272 132 286 186 266"/>
+    <path d="M 164 168 C 100 164 66 200 74 236 C 82 272 132 286 186 266"
+          transform="matrix(-1,0,0,1,512,0)"/>
+  </g>
+
+  <!-- tapered cup bowl -->
+  <path d="M 158 156 L 354 156 L 340 244 C 332 296 300 328 256 328
+           C 212 328 180 296 172 244 Z"
+        fill="#00B140"/>
+
+  <!-- rim lip -->
+  <rect x="150" y="140" width="212" height="20" rx="9" fill="#00B140"/>
+
+  <!-- gas bubbles inside the cup, framing the engraving -->
+  <g fill="#0A5C26">
+    <circle cx="208" cy="278" r="12" opacity="0.50"/>
+    <circle cx="300" cy="266" r="9" opacity="0.42"/>
+    <circle cx="256" cy="300" r="13" opacity="0.55"/>
+  </g>
+
+  <!-- ===== gold engraving: "TOP" over "10" ===== -->
+  <!-- TOP -->
+  <g fill="#FFC629">
+    <!-- T -->
+    <rect x="210" y="176" width="24" height="8"/>
+    <rect x="218" y="176" width="8" height="30"/>
+    <!-- O (ring) -->
+    <circle cx="256" cy="191" r="15"/>
+    <!-- P (stem + bowl) -->
+    <rect x="278" y="176" width="8" height="30"/>
+    <circle cx="291" cy="185" r="9.5"/>
+  </g>
+  <!-- counters punched in the bowl's own green -->
+  <g fill="#00B140">
+    <circle cx="256" cy="191" r="7"/>
+    <circle cx="291" cy="185" r="4"/>
+  </g>
+
+  <!-- 10 -->
+  <g fill="#FFC629">
+    <!-- 1 -->
+    <rect x="229" y="216" width="10" height="42"/>
+    <path d="M 221 228 L 229 216 L 229 232 Z"/>
+    <!-- 0 (ring) -->
+    <circle cx="270" cy="237" r="21"/>
+  </g>
+  <circle cx="270" cy="237" r="11" fill="#00B140"/>
+
+  <!-- collar under the bowl -->
+  <path d="M 226 328 L 286 328 L 278 350 L 234 350 Z" fill="#00B140"/>
+
+  <!-- stem -->
+  <rect x="240" y="350" width="32" height="38" fill="#00B140"/>
+
+  <!-- pedestal: upper plinth + wider base -->
+  <rect x="196" y="388" width="120" height="18" rx="6" fill="#00B140"/>
+  <rect x="168" y="406" width="176" height="32" rx="10" fill="#00B140"/>
+
+  <!-- vent slots on the base (echoes the app mark's trap base) -->
+  <g stroke="#0A5C26" stroke-width="8" stroke-linecap="round">
+    <line x1="212" y1="422" x2="230" y2="422"/>
+    <line x1="247" y1="422" x2="265" y2="422"/>
+    <line x1="282" y1="422" x2="300" y2="422"/>
+  </g>
+</svg>

@@ -29,7 +29,8 @@ void main() {
       String id, {
       required String uid,
       required int upvotes,
-      required String category,
+      required double hotScore,
+      List<String> searchTokens = const [],
       int reportCount = 0,
     }) {
       return firestore.collection('user_farts').doc(id).set({
@@ -37,7 +38,8 @@ void main() {
         'isPublic': true,
         'upvotes': upvotes,
         'downvotes': 0,
-        'category': category,
+        'hotScore': hotScore,
+        'searchTokens': searchTokens,
         'title': id,
         'fileUrl': 'url/$id',
         'fileType': 'mp3',
@@ -50,10 +52,29 @@ void main() {
       });
     }
 
-    // upvotes drive the descending order: fart1(10) > fart2(5) > fart3(1).
-    await seedFart('fart1', uid: 'authorA', upvotes: 10, category: 'Loud');
-    await seedFart('fart2', uid: 'authorB', upvotes: 5, category: 'Wet', reportCount: 1);
-    await seedFart('fart3', uid: 'authorA', upvotes: 1, category: 'Loud');
+    // hotScore drives the default (popular) order: fart1 > fart2 > fart3.
+    await seedFart(
+      'fart1',
+      uid: 'authorA',
+      upvotes: 10,
+      hotScore: 3.0,
+      searchTokens: ['thunder', 'alice'],
+    );
+    await seedFart(
+      'fart2',
+      uid: 'authorB',
+      upvotes: 5,
+      hotScore: 2.0,
+      reportCount: 1,
+      searchTokens: ['squeaker', 'bob'],
+    );
+    await seedFart(
+      'fart3',
+      uid: 'authorA',
+      upvotes: 1,
+      hotScore: 1.0,
+      searchTokens: ['thunder', 'alice', 'rumble'],
+    );
 
     // Current user's interactions: an upvote on fart1 and a report on fart2.
     await firestore
@@ -82,7 +103,7 @@ void main() {
       verify: (bloc) {
         final state = bloc.state as FetchFartsSuccess;
 
-        // Ordered by upvotes descending.
+        // Ordered by hotScore descending (Reddit-style popularity).
         expect(state.farts.map((f) => f.id).toList(), ['fart1', 'fart2', 'fart3']);
 
         // Author names resolved; authorA (fart1 & fart3) resolves to the same name.
@@ -102,12 +123,23 @@ void main() {
     );
 
     blocTest<FetchFartsBloc, FetchFartsState>(
-      'applies the category filter',
+      'search matches a single token',
       build: buildBloc,
-      act: (bloc) => bloc.add(const FetchTopFarts(category: 'Loud')),
+      act: (bloc) => bloc.add(const FetchTopFarts(searchQuery: 'thunder')),
       verify: (bloc) {
         final state = bloc.state as FetchFartsSuccess;
         expect(state.farts.map((f) => f.id).toList(), ['fart1', 'fart3']);
+      },
+    );
+
+    blocTest<FetchFartsBloc, FetchFartsState>(
+      'search requires ALL tokens to match, not just the first',
+      build: buildBloc,
+      act: (bloc) => bloc.add(const FetchTopFarts(searchQuery: 'thunder rumble')),
+      verify: (bloc) {
+        final state = bloc.state as FetchFartsSuccess;
+        // fart1 has "thunder" but not "rumble", so it must be excluded.
+        expect(state.farts.map((f) => f.id).toList(), ['fart3']);
       },
     );
 

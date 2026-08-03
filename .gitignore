@@ -45,3 +45,11 @@ app.*.map.json
 /android/app/release
 /android/key.properties
 /
+
+# Cloud Functions dependencies (installed via npm; never committed)
+functions/node_modules/
+functions/.env
+functions/firebase-debug.log
+
+# ESP32 firmware build output
+esp32/.pio/

@@ -27,18 +27,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
           return;
         }
 
-        final bool isAlreadyExist = await CloudFunctionsService.instance
-            .checkEmailExists(account.email.trim());
-
-        if (isAlreadyExist) {
-          emit(
-            const DashboardErrorState(
-              errorMessage: 'User already signed in or exists.',
-            ),
-          );
-          return;
-        }
-
+        // NOTE: no "email already exists" gate — Google is sign-in OR sign-up.
+        // The Firestore create-if-absent block below handles new vs. returning.
         final GoogleSignInAuthentication authenticate =
             await account.authentication;
 

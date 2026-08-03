@@ -21,6 +21,7 @@ import 'package:flatch/common/widgets/fart_card.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/cubits/fetch_farts/fetch_farts_cubit.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flatch/common/services/email_verification_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flatch/common/services/audio_route.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -118,9 +119,17 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
     }
   }
 
-  void _addComment() {
+  void _addComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
+
+    if (!await EmailVerificationGate.ensureVerified(
+      context,
+      action: 'comment',
+    )) {
+      return;
+    }
+    if (!mounted) return;
 
     context.read<FetchFartsBloc>().add(
       AddCommentFart(
@@ -459,7 +468,7 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
                         await ShareService.instance.shareFart(
                           fartId: updatedFart.id,
 
-                          title: 'Listen to this fart!',
+                          title: 'For your review.',
                         );
                       },
                       uid: updatedFart.uid,
@@ -570,7 +579,7 @@ class _FartDetailScreenState extends State<FartDetailScreen> {
                         await ShareService.instance.shareFart(
                           fartId: updatedFart.id,
 
-                          title: 'Listen to this fart!',
+                          title: 'For your review.',
                         );
                       },
                       uid: updatedFart.uid,

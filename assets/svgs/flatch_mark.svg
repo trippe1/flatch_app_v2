@@ -1,0 +1,25 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flatch "trap release" logo. Built in Signal Green with tonal opacities;
+       the tab bar tints it (green when active, muted gray when inactive). -->
+  <!-- rising gas -->
+  <g fill="#00B140">
+    <circle cx="256" cy="292" r="34" opacity="0.9"/>
+    <circle cx="222" cy="232" r="24" opacity="0.6"/>
+    <circle cx="272" cy="176" r="16" opacity="0.38"/>
+    <circle cx="240" cy="126" r="10" opacity="0.22"/>
+  </g>
+  <!-- release cone (widening upward) -->
+  <path d="M 196 372 L 158 132 L 208 132 L 232 372 Z" fill="#00B140" opacity="0.10" transform="translate(60,0)"/>
+  <path d="M 196 372 L 158 132 L 208 132 L 232 372 Z" fill="#00B140" opacity="0.10" transform="matrix(-1,0,0,1,452,0)"/>
+  <!-- trap base -->
+  <rect x="160" y="372" width="192" height="52" rx="15" fill="#00B140"/>
+  <!-- open doors -->
+  <path d="M 184 372 L 116 322 L 139 306 L 246 368 Z" fill="#00B140" opacity="0.75"/>
+  <path d="M 328 372 L 396 322 L 373 306 L 266 368 Z" fill="#00B140" opacity="0.75"/>
+  <!-- vent slots on the base -->
+  <g stroke="#0A5C26" stroke-width="8" stroke-linecap="round">
+    <line x1="204" y1="398" x2="228" y2="398"/>
+    <line x1="244" y1="398" x2="268" y2="398"/>
+    <line x1="284" y1="398" x2="308" y2="398"/>
+  </g>
+</svg>
