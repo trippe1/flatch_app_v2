@@ -53,12 +53,20 @@ class KBottomAppBar extends StatelessWidget {
                 children: List.generate(allSvgs.length, (index) {
                   final bool isSelected = state.index == index;
 
+                  // The Flatch mark (community, 0) has generous internal
+                  // padding in its 512×512 artboard, so at 34px it reads
+                  // smaller than the tight-viewBox FWB glyph. Render it larger
+                  // so its visual weight matches the neighbouring icons, and
+                  // trim its button padding so the tap target stays aligned.
+                  final double iconSize = index == 0 ? 46 : 34;
+                  final double iconPad = index == 0 ? 6 : 12;
+
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        iconSize: 34,
-                        padding: const EdgeInsets.all(12),
+                        iconSize: iconSize,
+                        padding: EdgeInsets.all(iconPad),
                         style: ButtonStyle().copyWith(
                           backgroundColor: WidgetStatePropertyAll(
                             isSelected
@@ -90,8 +98,8 @@ class KBottomAppBar extends StatelessWidget {
                         },
                         icon: SvgPicture.asset(
                           allSvgs[index],
-                          width: 34,
-                          height: 34,
+                          width: iconSize,
+                          height: iconSize,
                           color:
                               isSelected
                                   // The device tab lights up blue so
