@@ -5,6 +5,7 @@ import 'package:flatch/common/widgets/bottom_app_bar.dart';
 import 'package:flatch/common/widgets/community_gate.dart';
 import 'package:flatch/cubits/user_app_dashboard/user_app_dashboard_cubit.dart';
 import 'package:flatch/views/home/fetch_farts.dart';
+import 'package:flatch/views/fwb/fwb_home_screen.dart';
 import 'package:flatch/views/home/upload_fart.dart';
 import 'package:flatch/views/home/bluetooth_sync.dart';
 import 'package:flatch/views/profile/user_profile.dart';
@@ -17,14 +18,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 //                  is NOT wrapped in AuthGate: guests see Stock Farts and the
 //                  "create an account" gate; it reveals community categories
 //                  once signed in.
-//   1 Upload     — gated (an account is required to post).
-//   2 Bluetooth  — the device connection + slots. Guest-accessible.
-//   3 Settings   — guest-accessible. UserProfileScreen shows a reduced,
+//   1 FWB        — Farts with Buddies. Gated (private group chat needs an
+//                  account).
+//   2 Upload     — gated (an account is required to post).
+//   3 Bluetooth  — the device connection + slots. Guest-accessible.
+//   4 Settings   — guest-accessible. UserProfileScreen shows a reduced,
 //                  account-free settings view to guests (theme, legal, about,
 //                  buy device) with a "create account" prompt; the full
 //                  profile/account options appear once signed in.
 List<Widget> _childs = [
   FartsPage(),
+  AuthGate(feature: 'use Farts with Buddies', child: FwbHomeScreen()),
   AuthGate(feature: 'share your own sounds', child: UploadFartScreen()),
   FlatchBleScreen(),
   UserProfileScreen(),

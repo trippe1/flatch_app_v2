@@ -14,6 +14,8 @@ import 'package:flatch/common/services/deep_link_service.dart';
 import 'package:flatch/common/services/push_messaging_service.dart';
 import 'package:flatch/core/app.dart';
 import 'package:flatch/firebase_options.dart';
+import 'package:flatch/common/services/device_key_service.dart';
+import 'package:flatch/common/services/firestore_cached_key_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
@@ -35,6 +37,11 @@ void main() async {
             ? AppleProvider.debug
             : AppleProvider.appAttestWithDeviceCheckFallback,
   );
+
+  // Device auth: fetch per-device keys from the server (App Check gated) and
+  // cache them in secure storage. The bundled test provider stays the default
+  // for unit tests; production swaps it here.
+  DeviceKeyService.keyProvider = const FirestoreCachedKeyProvider();
 
   // Must be registered before runApp for background push delivery.
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

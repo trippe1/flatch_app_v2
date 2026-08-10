@@ -9,6 +9,7 @@ import 'package:flatch/common/services/share_service.dart';
 import 'package:flatch/common/widgets/fart_preview.dart';
 import 'package:flatch/blocs/moderation_queue/moderation_queue_bloc.dart';
 import 'package:flatch/views/about/about_screen.dart';
+import 'package:flatch/views/accident/accident_detail_page.dart';
 import 'package:flatch/views/age_gate/age_gate_screen.dart';
 import 'package:flatch/views/home/stock_sounds_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -80,6 +81,7 @@ enum AppRoute {
   fwbCreate,
   fwbChat,
   fwbJoin,
+  accidentCounter,
 }
 
 class AppRoutes {
@@ -109,6 +111,7 @@ class AppRoutes {
   static const String ageGate = '/age-gate';
   static const String stockSounds = '/stock-sounds';
   static const String about = '/about';
+  static const String accidentCounter = '/accident-counter';
   static const String fwbHome = '/fwb';
   static const String fwbCreate = '/fwb/create';
   static const String fwbChat = '/fwb/chat';
@@ -259,6 +262,12 @@ class AppRoutes {
         path: about,
         name: AppRoute.about.name,
         builder: (context, state) => const AboutScreen(),
+      ),
+
+      GoRoute(
+        path: accidentCounter,
+        name: AppRoute.accidentCounter.name,
+        builder: (context, state) => const AccidentDetailPage(),
       ),
 
       // Farts with Buddies. Declare the static sub-paths before the

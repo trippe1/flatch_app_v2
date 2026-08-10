@@ -9,7 +9,9 @@ import 'package:flatch/common/local_db/local_database.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/url_services.dart';
 import 'package:flatch/common/services/fwb_service.dart';
+import 'package:flatch/common/widgets/accident_counter.dart';
 import 'package:flatch/common/widgets/progress_indicator.dart';
+import 'package:flatch/cubits/accident_counter/accident_counter_cubit.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/cubits/user_app_dashboard/user_app_dashboard_cubit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -287,6 +289,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  /// Profile card holding the badge-size "Days Since Last Accident" scoreboard.
+  /// Tapping anywhere opens the detail page.
+  Widget _buildAccidentBadge(BuildContext context) {
+    return BlocBuilder<AccidentCounterCubit, AccidentCounterState>(
+      builder: (context, state) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF12351F).withOpacity(0.10),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x337ED957)),
+          ),
+          child: Center(
+            child: AccidentCounter(
+              value: state.daysSince,
+              size: AccidentCounterSize.badge,
+              rollToken: state.rollToken,
+              onTap: () =>
+                  GoRouter.of(context).pushNamed(AppRoute.accidentCounter.name),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _successState(BuildContext context, ProfileManagmentLoaded state) {
     final user = state.user;
 
@@ -404,6 +432,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ],
           ),
         ),
+
+        const SizedBox(height: 22),
+        _buildAccidentBadge(context),
 
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

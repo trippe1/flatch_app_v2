@@ -160,6 +160,24 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ---------- firmware release pointer ----------
+    // The current firmware version + download URL, read by the app to offer
+    // device OTA updates. Readable by any signed-in user; written only by an
+    // admin / the release pipeline.
+    match /firmware/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- per-device auth keys ----------
+    // NEVER client-accessible. MAC addresses are broadcast over BLE (public),
+    // so a readable key collection could be enumerated to harvest every device
+    // key. The app reaches keys only through the getDeviceKey Cloud Function,
+    // which uses the Admin SDK (bypasses these rules) behind App Check + auth.
+    match /device_keys/{mac} {
+      allow read, write: if false;
+    }
+
     // Everything else: denied by default (no catch-all).
   }
 }

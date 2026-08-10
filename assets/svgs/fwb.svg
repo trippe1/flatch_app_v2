@@ -1,0 +1,19 @@
+<svg viewBox="0 0 160 110" xmlns="http://www.w3.org/2000/svg">
+  <!-- "FWB" (Farts with Buddies) bottom-nav glyph. Stroked letterforms at a
+       uniform weight so it matches the line-art style of the + (upload) and
+       wireless (device) tab icons. Single-colour: the nav bar tints the whole
+       thing (green when selected, muted grey otherwise). -->
+  <g fill="none" stroke="#1A1A1A" stroke-width="15"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- F -->
+    <path d="M14,15 L14,95"/>
+    <path d="M14,15 L40,15"/>
+    <path d="M14,55 L36,55"/>
+    <!-- W -->
+    <path d="M50,15 L58,95 L73,50 L88,95 L96,15"/>
+    <!-- B -->
+    <path d="M110,15 L110,95"/>
+    <path d="M110,15 L128,15 Q142,15 142,34 Q142,53 128,53 L110,53"/>
+    <path d="M110,53 L131,53 Q146,53 146,74 Q146,95 131,95 L110,95"/>
+  </g>
+</svg>

@@ -17,6 +17,7 @@ import 'package:flatch/common/app_helpers/theme_helper.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/styles/app_styles.dart';
 import 'package:flatch/cubits/Individual_signup/individual_signup_cubit.dart';
+import 'package:flatch/cubits/accident_counter/accident_counter_cubit.dart';
 import 'package:flatch/cubits/audio_trim/audio_trim_cubit.dart';
 import 'package:flatch/cubits/upload_draft/upload_draft_cubit.dart';
 import 'package:flatch/cubits/delete_user_account/delete_user_account_cubit.dart';
@@ -79,6 +80,9 @@ class MyApp extends StatelessWidget {
 
         BlocProvider<FlatchBleCubit>(create: (context) => FlatchBleCubit()),
         BlocProvider<FetchFartsCubit>(create: (context) => FetchFartsCubit()),
+        BlocProvider<AccidentCounterCubit>(
+          create: (context) => AccidentCounterCubit(),
+        ),
 
         BlocProvider<DeleteUserAccountCubit>(
           create: (context) => DeleteUserAccountCubit(),

@@ -18,6 +18,7 @@ import 'package:flatch/common/widgets/social_buttons.dart';
 import 'package:flatch/common/widgets/text.dart';
 import 'package:flatch/common/widgets/text_field_with_text.dart';
 import 'package:flatch/cubits/Individual_signup/individual_signup_cubit.dart';
+import 'package:flatch/cubits/accident_counter/accident_counter_cubit.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
@@ -47,6 +48,11 @@ class _IndividualSignupState extends State<IndividualSignup> {
   String countryValue = "";
   String stateValue = "";
   String? nameError;
+
+  /// Optional "when was your last accident?" — skippable; if set, seeds the
+  /// Days Since Last Accident counter once the account exists.
+  DateTime? lastAccidentDate;
+  bool _accidentSeeded = false;
 
   bool showPasswordErrorsState = false;
 
@@ -93,6 +99,13 @@ class _IndividualSignupState extends State<IndividualSignup> {
         builder: (context, state) {
           if (state is DashboardSuccessState) {
             final User user = state.user;
+
+            // Seed the accident counter from the optional signup field once the
+            // account (and its app_users doc) exists.
+            if (lastAccidentDate != null && !_accidentSeeded) {
+              _accidentSeeded = true;
+              context.read<AccidentCounterCubit>().setDate(lastAccidentDate!);
+            }
 
             Timer(const Duration(milliseconds: 100), () async {
               if (!user.emailVerified) {
@@ -274,6 +287,59 @@ class _IndividualSignupState extends State<IndividualSignup> {
               }
               return null;
             },
+          ),
+          const Gap(20),
+          TextWidget(
+            text: "When was your last accident? (i.e., sharted)",
+            weight: FontWeight.w600,
+            size: 14,
+            color: AppColors.primary,
+          ),
+          const Gap(6),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: lastAccidentDate ?? now,
+                firstDate: DateTime(now.year - 20),
+                lastDate: now,
+                helpText: 'Date of last accident',
+              );
+              if (picked != null) setState(() => lastAccidentDate = picked);
+            },
+            child: InputDecorator(
+              decoration: InputDecoration(
+                hintText: 'MM/DD/YYYY (optional)',
+                prefixIcon: const Icon(
+                  CupertinoIcons.calendar,
+                  color: AppColors.primary,
+                ),
+                suffixIcon: lastAccidentDate == null
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () =>
+                            setState(() => lastAccidentDate = null),
+                      ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                lastAccidentDate == null
+                    ? 'MM/DD/YYYY (optional)'
+                    : '${lastAccidentDate!.month.toString().padLeft(2, '0')}/'
+                        '${lastAccidentDate!.day.toString().padLeft(2, '0')}/'
+                        '${lastAccidentDate!.year}',
+                style: TextStyle(
+                  color: lastAccidentDate == null
+                      ? Colors.grey
+                      : Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+            ),
           ),
           const Gap(20),
           TextWidget(

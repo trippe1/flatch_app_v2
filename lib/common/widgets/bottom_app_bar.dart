@@ -15,10 +15,11 @@ class KBottomAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<String> allSvgs = [
-      "assets/svgs/flatch_mark.svg", // far-left: community (the Flatch app mark)
-      "assets/svgs/add.svg", // upload
-      "assets/svgs/device_signal.svg", // device connection (generic wireless glyph)
-      "assets/svgs/settings.svg", // settings / profile
+      "assets/svgs/flatch_mark.svg", // 0 community (the Flatch app mark)
+      "assets/svgs/fwb.svg", // 1 Farts with Buddies
+      "assets/svgs/add.svg", // 2 upload
+      "assets/svgs/device_signal.svg", // 3 device connection (wireless glyph)
+      "assets/svgs/settings.svg", // 4 settings / profile
     ];
 
     double width = MediaQuery.of(context).size.width;
@@ -81,7 +82,7 @@ class KBottomAppBar extends StatelessWidget {
                           context.read<UserAppDashboardCubit>().onUpdateIndex(
                             index,
                           );
-                          if (index == 1) {
+                          if (index == 2) {
                             context
                                 .read<UserAppDashboardCubit>()
                                 .onTapActions();
@@ -96,7 +97,7 @@ class KBottomAppBar extends StatelessWidget {
                                   // The device tab lights up blue so
                                   // "hardware" reads apart from the green
                                   // community/app actions.
-                                  ? (index == 2
+                                  ? (index == 3
                                       ? AppColors.signalBlue
                                       : Theme.of(context).colorScheme.primary)
                                   : Theme.of(

@@ -38,12 +38,25 @@ class FlatchBleState extends Equatable {
   final bool blePermissionDenied;
   final bool blePermissionPermanentlyDenied;
 
+  // ---- Firmware / OTA ----
+  // The version the connected device reported (null until it replies VERSION:).
+  final String? deviceFirmwareVersion;
+  // Non-null while an OTA is in progress; its label drives the progress UI.
+  final String? otaStateLabel;
+  final double otaProgress; // 0..1 during download
+  // A user-facing OTA error message (set on OTA_ERROR), cleared on retry.
+  final String? otaError;
+
 
 
 
   const FlatchBleState({
     this.blePermissionDenied = false,
     this.blePermissionPermanentlyDenied = false,
+    this.deviceFirmwareVersion,
+    this.otaStateLabel,
+    this.otaProgress = 0.0,
+    this.otaError,
     this.isBluetoothOn = false,
     this.isBluetoothOff = false,
     this.isLoading = false,
@@ -69,6 +82,11 @@ class FlatchBleState extends Equatable {
   FlatchBleState copyWith({
     bool? blePermissionDenied,
     bool? blePermissionPermanentlyDenied,
+    String? deviceFirmwareVersion,
+    String? otaStateLabel,
+    double? otaProgress,
+    String? otaError,
+    bool? clearOtaState, // set true to null out otaStateLabel/otaError
     bool? isBluetoothOn,
     bool? isBluetoothOff,
     bool? isLoading,
@@ -94,6 +112,12 @@ class FlatchBleState extends Equatable {
       blePermissionDenied: blePermissionDenied ?? this.blePermissionDenied,
       blePermissionPermanentlyDenied:
           blePermissionPermanentlyDenied ?? this.blePermissionPermanentlyDenied,
+      deviceFirmwareVersion:
+          deviceFirmwareVersion ?? this.deviceFirmwareVersion,
+      otaStateLabel:
+          (clearOtaState ?? false) ? null : (otaStateLabel ?? this.otaStateLabel),
+      otaProgress: otaProgress ?? this.otaProgress,
+      otaError: (clearOtaState ?? false) ? null : (otaError ?? this.otaError),
       isBluetoothOn: isBluetoothOn ?? this.isBluetoothOn,
       isBluetoothOff: isBluetoothOff ?? this.isBluetoothOff,
       isLoading: isLoading ?? this.isLoading,
@@ -121,6 +145,10 @@ class FlatchBleState extends Equatable {
   List<Object?> get props => [
     blePermissionDenied,
     blePermissionPermanentlyDenied,
+    deviceFirmwareVersion,
+    otaStateLabel,
+    otaProgress,
+    otaError,
     isBluetoothOn,
     isBluetoothOff,
     isLoading,

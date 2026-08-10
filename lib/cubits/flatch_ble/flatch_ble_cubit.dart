@@ -6,7 +6,9 @@ import 'dart:typed_data';
 
 import 'package:bloc/bloc.dart';
 import 'package:flatch/common/constants/flatch_ble_constants.dart';
+import 'package:flatch/common/constants/ota_protocol.dart';
 import 'package:flatch/common/services/device_key_service.dart';
+import 'package:flatch/common/services/firmware_release_service.dart';
 import 'package:flatch/common/services/telemetry_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:equatable/equatable.dart';
@@ -525,8 +527,84 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
 
       await requestSlotList();
 
+      // Ask for the firmware version so the app can offer OTA updates. Fire and
+      // forget — the reply arrives on the status stream as VERSION:<semver>.
+      try {
+        await _sendCmdRaw(OtaProtocol.cmdGetVersion);
+      } catch (_) {}
+
       emit(state.copyWith(statusMessage: "Device ready. Standing by.", isConnecting: false));
   }
+
+  // ===================== OTA (firmware update) =====================
+
+  /// Kick off an over-the-air firmware update to [release]. The device does the
+  /// heavy lifting (WiFi + download + verify + install + rollback); the app
+  /// just hands it the URL/hash and relays progress. [wifiSsid]/[wifiPassword]
+  /// are optional — send them if the device isn't otherwise provisioned.
+  ///
+  /// Reports failures via the `otaError` state field; progress via
+  /// `otaStateLabel` / `otaProgress`. See OtaProtocol / docs/OTA_PROTOCOL.md.
+  Future<void> startOta(
+    FirmwareRelease release, {
+    String? wifiSsid,
+    String? wifiPassword,
+  }) async {
+    if (!_authed || _cmd == null) {
+      emit(state.copyWith(otaError: "Connect to your Flatch first."));
+      return;
+    }
+    emit(
+      state.copyWith(
+        clearOtaState: true,
+        otaStateLabel: 'Starting update…',
+        otaProgress: 0.0,
+      ),
+    );
+
+    try {
+      // 1. WiFi (if provided).
+      if (wifiSsid != null && wifiSsid.isNotEmpty) {
+        await _sendCmdRaw(
+          '${OtaProtocol.cmdWifiPrefix}$wifiSsid${OtaProtocol.sep}'
+          '${wifiPassword ?? ''}',
+        );
+      }
+
+      // 2. Send the URL in chunks (a signed URL can exceed the BLE MTU).
+      await _sendCmdRaw(OtaProtocol.cmdUrlClear);
+      final url = release.url;
+      for (var i = 0; i < url.length; i += OtaProtocol.urlChunkSize) {
+        final end = (i + OtaProtocol.urlChunkSize).clamp(0, url.length);
+        await _sendCmdRaw(
+          '${OtaProtocol.cmdUrlAppendPrefix}${url.substring(i, end)}',
+        );
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+
+      // 3. Start.
+      await _sendCmdRaw(
+        '${OtaProtocol.cmdStartPrefix}${release.sizeBytes},'
+        '${release.sha256},${release.version}',
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          clearOtaState: true,
+          otaError: "Couldn't start the update. Try again.",
+        ),
+      );
+    }
+  }
+
+  Future<void> abortOta() async {
+    try {
+      await _sendCmdRaw(OtaProtocol.cmdAbort);
+    } catch (_) {}
+    emit(state.copyWith(clearOtaState: true, otaProgress: 0.0));
+  }
+
+  void clearOtaError() => emit(state.copyWith(clearOtaState: true));
 
 
   // ===================== AUTH =====================
@@ -585,6 +663,49 @@ class FlatchBleCubit extends Cubit<FlatchBleState> {
       if (_authCompleter != null && !_authCompleter!.isCompleted) {
         _authCompleter!.complete();
       }
+      return;
+    }
+
+    // ---- OTA / firmware ----
+    if (msg.startsWith(OtaProtocol.sVersion)) {
+      emit(
+        state.copyWith(
+          deviceFirmwareVersion:
+              msg.substring(OtaProtocol.sVersion.length).trim(),
+        ),
+      );
+      return;
+    }
+    if (msg.startsWith(OtaProtocol.sOtaState)) {
+      final st = OtaDeviceState.parse(
+        msg.substring(OtaProtocol.sOtaState.length),
+      );
+      if (st != null) emit(state.copyWith(otaStateLabel: st.label));
+      return;
+    }
+    if (msg.startsWith(OtaProtocol.sOtaProgress)) {
+      final p = msg.substring(OtaProtocol.sOtaProgress.length).split('/');
+      final done = int.tryParse(p.first.trim()) ?? 0;
+      final total = p.length > 1 ? (int.tryParse(p[1].trim()) ?? 0) : 0;
+      if (total > 0) {
+        emit(state.copyWith(otaProgress: (done / total).clamp(0.0, 1.0)));
+      }
+      return;
+    }
+    if (msg.startsWith(OtaProtocol.sOtaError)) {
+      final err = OtaError.parse(msg.substring(OtaProtocol.sOtaError.length));
+      emit(state.copyWith(clearOtaState: true, otaError: err.message));
+      return;
+    }
+    if (msg == OtaProtocol.sOtaDone) {
+      // Device installed the image and is rebooting; it will drop the BLE link,
+      // re-advertise on the new firmware, and (on reconnect) report VERSION:.
+      emit(
+        state.copyWith(
+          otaStateLabel: OtaDeviceState.rebooting.label,
+          otaProgress: 1.0,
+        ),
+      );
       return;
     }
 

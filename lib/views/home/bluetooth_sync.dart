@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flatch/blocs/my_uploads/my_uploads_bloc.dart';
 import 'package:flatch/common/color/app_colors.dart';
+import 'package:flatch/views/home/firmware_update_card.dart';
 import 'package:flatch/common/extensions/media_query_extension.dart';
 import 'package:flatch/common/models/fart_model.dart';
 import 'package:flatch/common/routes/app_routes.dart';
@@ -691,6 +692,9 @@ class _FlatchBleScreenState extends State<FlatchBleScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
+
+          // Firmware OTA: offers/relays a device update when connected.
+          const FirmwareUpdateCard(),
 
           if (state.uploadProgress > 0 && state.uploadProgress < 1)
             Padding(

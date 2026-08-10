@@ -690,3 +690,60 @@ exports.checkAccountExists = onCall(
     }
   }
 );
+
+// ===========================================================================
+//  Device authentication: per-device key lookup
+// ===========================================================================
+// The Flatch device authenticates the app with a challenge–response: it sends
+// a random challenge + its MAC, and the app must return HMAC-SHA256(key,
+// challenge). Each device has its own key, stored ONLY here (in device_keys,
+// which is not client-readable — see firestore.rules) and in the device's own
+// flash.
+//
+// The app fetches its device's key through this function ONCE per device, then
+// caches it in the phone's secure storage so reconnects work offline. Routing
+// through a callable (not a direct Firestore read) is what prevents key
+// harvesting: MACs are broadcast over BLE and therefore public, so a readable
+// key collection could be enumerated. App Check + auth + this indirection keep
+// the keys server-only.
+exports.getDeviceKey = onCall(
+  { region: LOCATION, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
+
+    const mac = String(request.data?.mac || "").trim().toLowerCase();
+    // Basic shape check: aa:bb:cc:dd:ee:ff
+    if (!/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(mac)) {
+      throw new HttpsError("invalid-argument", "A valid device MAC is required.");
+    }
+
+    const snap = await admin.firestore().collection("device_keys").doc(mac).get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "This device is not registered.");
+    }
+    const data = snap.data();
+    if (data.active === false) {
+      // Lets you revoke a device without deleting its record.
+      throw new HttpsError("permission-denied", "This device has been disabled.");
+    }
+    if (!data.key) {
+      throw new HttpsError("internal", "Device record is missing its key.");
+    }
+
+    // Best-effort audit trail (who fetched which device, when).
+    try {
+      await snap.ref.set(
+        {
+          lastFetchedBy: request.auth.uid,
+          lastFetchedAt: admin.firestore.FieldValue.serverTimestamp(),
+          fetchCount: admin.firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
+    } catch (_) {}
+
+    return { key: data.key };
+  }
+);

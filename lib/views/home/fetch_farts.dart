@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flatch/blocs/fetch_farts/fetch_farts_bloc.dart';
 import 'package:flatch/common/enums/fart_filters.dart';
+import 'package:flatch/common/widgets/header_accident_counter.dart';
 import 'package:flatch/common/logics/sorting_logics.dart';
 import 'package:flatch/common/routes/app_routes.dart';
 import 'package:flatch/common/services/audio_cache_service.dart';
@@ -327,21 +328,10 @@ class _FartsPageState extends State<FartsPage> {
         ),
         centerTitle: true,
         elevation: 0,
+        actions: const [HeaderAccidentCounter()],
       ),
-      floatingActionButton: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        initialData: FirebaseAuth.instance.currentUser,
-        builder: (context, snap) {
-          if (snap.data == null) return const SizedBox.shrink();
-          return FloatingActionButton.extended(
-            heroTag: 'fwbFab',
-            backgroundColor: AppColors.primary,
-            onPressed: () => context.pushNamed(AppRoute.fwbHome.name),
-            icon: const Icon(Icons.groups_rounded, color: Colors.white),
-            label: const Text('FWB', style: TextStyle(color: Colors.white)),
-          );
-        },
-      ),
+      // FWB moved to its own bottom-nav tab (between Community and +), so the
+      // floating shortcut here is gone.
       body: MultiBlocListener(
         listeners: [
           BlocListener<FetchFartsBloc, FetchFartsState>(
