@@ -406,7 +406,10 @@ class _AccidentDetailPageState extends State<AccidentDetailPage>
   Widget _dateRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      // NOT stretch: in a scroll view the Row's height is unbounded, and
+      // stretch forces infinite height on the button's Stack — which silently
+      // hides the TODAY button in release builds (assertions stripped).
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
           width: 150,
