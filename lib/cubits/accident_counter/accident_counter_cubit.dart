@@ -86,9 +86,9 @@ class AccidentCounterCubit extends Cubit<AccidentCounterState>
     } catch (_) {}
     _emitFor(iso);
 
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      try {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
         final snap = await FirebaseFirestore.instance
             .collection('app_users')
             .where('uid', isEqualTo: uid)
@@ -101,9 +101,9 @@ class AccidentCounterCubit extends Cubit<AccidentCounterState>
             _emitFor(remote);
           }
         }
-      } catch (_) {
-        // offline / not ready — keep the local value.
       }
+    } catch (_) {
+      // offline, Firebase not ready, or not signed in — keep the local value.
     }
     _scheduleMidnight();
   }
@@ -176,9 +176,9 @@ class AccidentCounterCubit extends Cubit<AccidentCounterState>
   }
 
   Future<void> _persistRemote(String iso) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
     try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
       final snap = await FirebaseFirestore.instance
           .collection('app_users')
           .where('uid', isEqualTo: uid)
