@@ -12,7 +12,7 @@
 	<array>
 		<string>applinks:flatch.app</string>
 		<string>applinks:flik.me</string>
-		<string>webcredentials:example.com</string>
+		<string>webcredentials:flatch.app</string>
 	</array>
 </dict>
 </plist>
