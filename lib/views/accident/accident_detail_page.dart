@@ -324,9 +324,18 @@ class _AccidentDetailPageState extends State<AccidentDetailPage>
       appBar: AppBar(
         backgroundColor: _bg,
         elevation: 0,
+        // The page is always dark, so pin the back arrow + title to light
+        // regardless of the app theme — otherwise light mode paints a dark
+        // (invisible) arrow on the dark bar.
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white, size: 28),
         title: const Text(
           'Days since last accident',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            color: Colors.white,
+          ),
         ),
       ),
       // Any tap during the sequence skips to the end state.
